@@ -1,30 +1,20 @@
 import way from "wayy";
 import ePub from "epubjs";
-import {
-  useCacheSignal,
-  storeFileInDB,
-  retrieveFileFromDB,
-  generateSpeech,
-  playAudioBuffer,
-  findNthTextElement,
-} from "./util.ts";
+import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./util.ts";
 
-way.comp("epubreader", () => {
+way.comp("epub", () => {
   const loaded = way.signal(false);
-  const state = useCacheSignal("state", { section: 0, node: 0 });
   const title = way.signal("");
-  const isPlaying = way.signal(false);
-
-  let book: any = null;
+  const book = way.signal<any>(null);
 
   const loadBookFromArrayBuffer = async (arrayBuffer: ArrayBuffer) => {
-    book = ePub(arrayBuffer);
-    await book.ready;
-    loaded.value = true;
+    const newBook = ePub(arrayBuffer);
+    await newBook.ready;
 
-    const metadata = await book.loaded.metadata;
+    const metadata = await newBook.loaded.metadata;
     title.value = metadata.title;
-    console.log("Book loaded:", metadata);
+    book.value = newBook;
+    loaded.value = true;
   };
 
   // Try to load cached book on component mount
@@ -42,20 +32,6 @@ way.comp("epubreader", () => {
 
   loadCachedBook();
 
-  const onkey = (ev: KeyboardEvent) => {
-    //
-    const key = ev.key;
-    if (key === "ArrowLeft") {
-      state.value = { ...state.value, section: state.value.section - 1 };
-    }
-    if (key === "ArrowRight") {
-      state.value = { ...state.value, section: state.value.section + 1 };
-    }
-    // console.log(ev);
-  };
-
-  window.addEventListener("keydown", onkey);
-
   const fileSelect = async (ev: Event) => {
     const target = ev.target as HTMLInputElement;
     const selectedFile = target.files?.[0];
@@ -69,10 +45,25 @@ way.comp("epubreader", () => {
     await loadBookFromArrayBuffer(arrayBuffer);
   };
 
-  const next = () =>
-    (state.value = { ...state.value, section: state.value.section + 1 });
-  const prev = () =>
-    (state.value = { ...state.value, section: state.value.section - 1 });
+  return { loaded, title, book, fileSelect };
+});
+
+way.comp("reader", ({ props: { book } }) => {
+  const state = useCacheSignal("state", { section: 0, node: 0 });
+  const isPlaying = way.signal(false);
+
+  const onkey = (ev: KeyboardEvent) => {
+    const key = ev.key;
+    if (key === "ArrowLeft") prev();
+    if (key === "ArrowRight") next();
+  };
+
+  window.addEventListener("keydown", onkey);
+
+  const step = (x: number) =>
+    (state.value = { ...state.value, section: state.value.section + x });
+  const next = () => step(1);
+  const prev = () => step(-1);
 
   const playpause = async () => {
     isPlaying.value = !isPlaying.value;
@@ -83,19 +74,25 @@ way.comp("epubreader", () => {
   const epub = document.getElementById("epub");
 
   way.effect(() => {
-    if (!loaded.value || !epub || !book) return;
+    console.log(book?.value);
+
+    if (!book?.value || !epub) return;
 
     const loadSection = async () => {
-      const s = book.spine.get(state.value.section);
-      const doc = await s?.load(book.load.bind(book));
+      const s = book.value.spine.get(state.value.section);
+      const doc = await s?.load(book.value.load.bind(book.value));
+
       const body = doc.querySelector("body")?.firstElementChild;
       if (!body) return;
       const contents = body.cloneNode(true);
+      console.log(contents);
+
       epub?.replaceChildren(contents);
     };
 
     loadSection();
   });
 
-  return { loaded, fileSelect, state, next, prev, title, isPlaying, playpause };
+  return { state, next, prev, isPlaying, playpause };
 });
+

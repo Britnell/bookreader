@@ -11,9 +11,9 @@
   </head>
   <body>
     <header>bookreader</header>
-    <main x-comp="epubreader">
+    <main x-comp="epub">
       <h1>bookreader</h1>
-      <section x-show="!loaded.value">
+      <section x-show="!book.value">
         <input
           name="src"
           id="src"
@@ -24,7 +24,7 @@
       </section>
       <article x-else>
         <h2 x-text="title.value || 'epub'"></h2>
-        <div>
+        <div x-comp="reader" x-props="{book}">
           <button
             @click="playpause()"
             x-text="isPlaying.value ? 'Pause' : 'play'"
