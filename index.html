@@ -23,7 +23,7 @@
         />
       </section>
       <article x-else>
-        <h2>epub</h2>
+         <h2 x-text="title.value || 'epub'"></h2>
         <div>
           <button @click="prev()">Previous</button>
           <button @click="next()">Next</button>

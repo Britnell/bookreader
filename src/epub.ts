@@ -1,22 +1,49 @@
 import way from "wayy";
 import ePub from "epubjs";
+import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./util.ts";
 
 way.comp("epubreader", () => {
   const loaded = way.signal(false);
-  const section = way.signal(0);
+  const state = useCacheSignal("state", { section: 0 });
+  const title = way.signal("");
 
   let book: any = null;
+
+  const loadBookFromArrayBuffer = async (arrayBuffer: ArrayBuffer) => {
+    book = ePub(arrayBuffer);
+    await book.ready;
+    loaded.value = true;
+
+    const metadata = await book.loaded.metadata;
+    title.value = metadata.title;
+    console.log("Book loaded:", metadata);
+  };
+
+  // Try to load cached book on component mount
+  const loadCachedBook = async () => {
+    try {
+      const cachedArrayBuffer = await retrieveFileFromDB("currentBook");
+      if (cachedArrayBuffer) {
+        await loadBookFromArrayBuffer(cachedArrayBuffer);
+        console.log("Cached book loaded");
+      }
+    } catch (error) {
+      console.warn("Failed to load cached book:", error);
+    }
+  };
+
+  loadCachedBook();
 
   const onkey = (ev: KeyboardEvent) => {
     //
     const key = ev.key;
     if (key === "ArrowLeft") {
-      section.value--;
+      state.value = { ...state.value, section: state.value.section - 1 };
     }
     if (key === "ArrowRight") {
-      section.value++;
+      state.value = { ...state.value, section: state.value.section + 1 };
     }
-    console.log(ev);
+    // console.log(ev);
   };
 
   window.addEventListener("keydown", onkey);
@@ -28,35 +55,31 @@ way.comp("epubreader", () => {
     if (!selectedFile) return;
 
     const arrayBuffer = await selectedFile.arrayBuffer();
-    book = ePub(arrayBuffer);
-    await book.ready;
-    loaded.value = true;
 
-    const metadata = await book.loaded.metadata;
-    console.log("Book loaded:", metadata);
+    // Store the file in IndexedDB and load it
+    await storeFileInDB("currentBook", arrayBuffer);
+    await loadBookFromArrayBuffer(arrayBuffer);
   };
 
-  const next = () => section.value++;
-  const prev = () => section.value--;
+  const next = () => state.value.section++;
+  const prev = () => state.value.section--;
 
   const epub = document.getElementById("epub");
 
   way.effect(() => {
-    if (!loaded.value-- || !book) return;
+    if (!loaded.value || !epub || !book) return;
 
-    book.spine
-      .get(section.value--)
-      ?.load(book.load.bind(book))
-      .then((doc: any) => {
-        const el = document.getElementById("epub");
-        if (!el) return;
+    const loadSection = async () => {
+      const s = book.spine.get(state.value.section);
+      const doc = await s?.load(book.load.bind(book));
+      const body = doc.querySelector("body")?.firstElementChild;
+      if (!body) return;
+      const contents = body.cloneNode(true);
+      epub?.replaceChildren(contents);
+    };
 
-        const body = doc.querySelector("body")?.firstElementChild;
-        if (!body) return;
-        const contents = body.cloneNode(true);
-        epub?.replaceChildren(contents);
-      });
+    loadSection();
   });
 
-  return { loaded, fileSelect, section, next, prev };
+  return { loaded, fileSelect, state, next, prev, title };
 });
