@@ -68,3 +68,99 @@ export async function retrieveFileFromDB(
     getRequest.onerror = () => reject(getRequest.error);
   });
 }
+
+export function findNthTextElement(root: Node, n: number): Node | null {
+  let count = 0;
+  let result: Node | null = null;
+
+  function traverse(node: Node): void {
+    if (result) return; // Already found the nth element
+
+    // Check if this is a leaf node (no children or no element children)
+    const hasElementChildren = Array.from(node.childNodes).some(
+      (child) => child.nodeType === Node.ELEMENT_NODE,
+    );
+
+    if (!hasElementChildren && node.textContent?.trim()) {
+      if (count === n) {
+        result = node;
+        return;
+      }
+      count++;
+    }
+
+    // Continue traversing children
+    for (const child of Array.from(node.childNodes)) {
+      traverse(child);
+    }
+  }
+
+  traverse(root);
+  return result;
+}
+
+export async function generateSpeech(
+  text: string,
+  voice: string = "alloy",
+  speed: number = 1.0,
+): Promise<ArrayBuffer> {
+  const response = await fetch("http://localhost:8880/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "kokoro",
+      input: text,
+      voice: voice,
+      response_format: "mp3",
+      speed: speed,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `TTS request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  return await response.arrayBuffer();
+}
+
+export async function getVoices(): Promise<string[]> {
+  const response = await fetch("http://localhost:8880/v1/audio/voices");
+
+  if (!response.ok) {
+    throw new Error(
+      `Voices request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const data = await response.json();
+  return data.voices || [];
+}
+
+export async function playAudioBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const audioContext = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+
+    audioContext.decodeAudioData(
+      arrayBuffer.slice(0),
+      (audioBuffer) => {
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        source.onended = () => {
+          resolve();
+        };
+
+        source.start(0);
+      },
+      (error) => {
+        reject(new Error(`Audio decoding failed: ${error}`));
+      },
+    );
+  });
+}

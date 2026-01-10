@@ -1,11 +1,19 @@
 import way from "wayy";
 import ePub from "epubjs";
-import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./util.ts";
+import {
+  useCacheSignal,
+  storeFileInDB,
+  retrieveFileFromDB,
+  generateSpeech,
+  playAudioBuffer,
+  findNthTextElement,
+} from "./util.ts";
 
 way.comp("epubreader", () => {
   const loaded = way.signal(false);
-  const state = useCacheSignal("state", { section: 0 });
+  const state = useCacheSignal("state", { section: 0, node: 0 });
   const title = way.signal("");
+  const isPlaying = way.signal(false);
 
   let book: any = null;
 
@@ -61,8 +69,16 @@ way.comp("epubreader", () => {
     await loadBookFromArrayBuffer(arrayBuffer);
   };
 
-  const next = () => state.value.section++;
-  const prev = () => state.value.section--;
+  const next = () =>
+    (state.value = { ...state.value, section: state.value.section + 1 });
+  const prev = () =>
+    (state.value = { ...state.value, section: state.value.section - 1 });
+
+  const playpause = async () => {
+    isPlaying.value = !isPlaying.value;
+
+    if (!isPlaying.value) return;
+  };
 
   const epub = document.getElementById("epub");
 
@@ -81,5 +97,5 @@ way.comp("epubreader", () => {
     loadSection();
   });
 
-  return { loaded, fileSelect, state, next, prev, title };
+  return { loaded, fileSelect, state, next, prev, title, isPlaying, playpause };
 });

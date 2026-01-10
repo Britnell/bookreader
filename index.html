@@ -23,12 +23,16 @@
         />
       </section>
       <article x-else>
-         <h2 x-text="title.value || 'epub'"></h2>
+        <h2 x-text="title.value || 'epub'"></h2>
         <div>
+          <button
+            @click="playpause()"
+            x-text="isPlaying.value ? 'Pause' : 'play'"
+          ></button>
           <button @click="prev()">Previous</button>
           <button @click="next()">Next</button>
         </div>
-          <div id="epub"></div>
+        <div id="epub"></div>
       </article>
     </main>
   </body>
