@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bookreader</title>
+    <!-- <link rel="stylesheet" href="/pages/style.css" /> -->
+    <script src="/src/way-inline.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header>bookreader</header>
+    <main x-comp="epubreader">
+      <h1>bookreader</h1>
+      <section x-show="!loaded.value">
+        <input
+          name="src"
+          id="src"
+          type="file"
+          accept=".epub"
+          @change="fileSelect($event)"
+        />
+      </section>
+      <article x-else>
+        <h2>epub</h2>
+        <div>
+          <button @click="prev()">Previous</button>
+          <button @click="next()">Next</button>
+        </div>
+          <div id="epub"></div>
+      </article>
+    </main>
+  </body>
+</html>

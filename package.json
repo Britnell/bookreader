@@ -1,0 +1,19 @@
+{
+  "name": "bookreader",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "epubjs": "^0.3.93",
+    "wayy": "^0.1.5"
+  }
+}
