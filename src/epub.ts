@@ -11,8 +11,6 @@ way.comp("epub", () => {
     const newBook = ePub(arrayBuffer);
     await newBook.ready;
 
-    console.log(newBook);
-    
     const metadata = await newBook.loaded.metadata;
     title.value = metadata.title;
     book.value = newBook;
@@ -25,7 +23,6 @@ way.comp("epub", () => {
       const cachedArrayBuffer = await retrieveFileFromDB("currentBook");
       if (cachedArrayBuffer) {
         await loadBookFromArrayBuffer(cachedArrayBuffer);
-        console.log("Cached book loaded");
       }
     } catch (error) {
       console.warn("Failed to load cached book:", error);

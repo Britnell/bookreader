@@ -24,7 +24,6 @@ way.comp("reader", ({ props: { book } }) => {
 
   function stepNode(x: number): void {
     const newIndex = state.value.pIndex + x;
-    console.log({newIndex});
     
     if(newIndex < 0) {
       // Move to previous section
@@ -71,7 +70,8 @@ way.comp("reader", ({ props: { book } }) => {
      const s = book.value.spine.get(state.value.section);
      const doc = await s?.load(book.value.load.bind(book.value));
 
-     const body = doc.querySelector("body")?.firstElementChild;
+     
+     const body = doc.querySelector("body")
      if (!body) return;
      const contents = body.cloneNode(true);
 
@@ -83,6 +83,7 @@ way.comp("reader", ({ props: { book } }) => {
      allPTags = getAllPTags(epub);
      
      const currentPTag = allPTags[state.value.pIndex];
+     
      console.log("Current section:", state.value.section, "P index:", state.value.pIndex, "P tag:", currentPTag);
      
      if (!currentPTag) {
