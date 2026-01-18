@@ -18,19 +18,20 @@ way.comp("reader", ({ props: { book } }) => {
 
    window.addEventListener("keydown", onkey);
 
-   const next = async () => {
-    // pause current if playing 
-    if (currAudio && isPlaying.value) {
-      currAudio.pause();
-    }
-     stepNode(1);
-     currAudio = nextAudio;
-     if (currAudio) {
-       currAudio.play();
+    const next = async () => {
+     // pause current if playing 
+     if (currAudio && isPlaying.value) {
+       currAudio.pause();
      }
-     const nextIndex = state.value.pIndex + 1;
-     nextAudio = await loadAudioForPTag(nextIndex);
-   };
+      stepNode(1);
+      currAudio = nextAudio;
+      if (currAudio) {
+        attachAudioEndedListener();
+        currAudio.play();
+      }
+      const nextIndex = state.value.pIndex + 1;
+      nextAudio = await loadAudioForPTag(nextIndex);
+    };
 
    const prev = () => stepNode(-1);
 
@@ -51,29 +52,36 @@ way.comp("reader", ({ props: { book } }) => {
      }
    }
 
-  const playpause = () => {
-    isPlaying.value = !isPlaying.value;
+   const playpause = () => {
+     isPlaying.value = !isPlaying.value;
 
-    if (isPlaying.value) {
-      if (paused.value && currAudio) {
-        currAudio.play();
-        paused.value = false;
-      } else if (currAudio && !loadingAudio.value) {
-        play();
-      }
-    } else {
+     if (isPlaying.value) {
+       if (paused.value && currAudio) {
+         currAudio.play();
+         paused.value = false;
+       } else if (currAudio && !loadingAudio.value) {
+         play();
+       }
+     } else {
+       if (currAudio) {
+         currAudio.pause();
+         paused.value = true;
+       }
+     }
+   };
+
+   const attachAudioEndedListener = () => {
+     if (currAudio) {
+       currAudio.addEventListener("ended", next);
+     }
+   };
+
+    async function play() {
       if (currAudio) {
-        currAudio.pause();
-        paused.value = true;
+        attachAudioEndedListener();
+        currAudio.play();
       }
     }
-  };
-
-   async function play() {
-     if (currAudio) {
-       currAudio.play();
-     }
-   }
 
    const epub = document.getElementById("epub");
 
