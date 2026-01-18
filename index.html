@@ -29,7 +29,7 @@
           <button
             @click="playpause()"
             x-text="isPlaying.value ? 'Pause' : 'play'"
-            disabled="loadingAudio"
+            :disabled="loadingAudio.value"
           ></button>
           <button @click="prev()">Previous</button>
           <button @click="next()">Next</button>

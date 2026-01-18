@@ -91,7 +91,7 @@ way.comp("reader", ({ props: { book } }) => {
        return;
      }
 
-     console.log("Found P tag:", currentPTag.textContent);
+     console.log("Found P tag:", {p:currentPTag.textContent});
      audioElement = await generateSpeech(currentPTag.textContent || "");
      loadingAudio.value = false;
    });
