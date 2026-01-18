@@ -1,6 +1,6 @@
 import way from "wayy";
 import ePub from "epubjs";
-import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./util.ts";
+import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./cache.ts";
 
 way.comp("epub", () => {
   const loaded = way.signal(false);

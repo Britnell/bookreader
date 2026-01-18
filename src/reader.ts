@@ -1,9 +1,13 @@
 import way from "wayy";
-import { useCacheSignal, findNthTextElement, generateSpeech } from "./util.ts";
+import { useCacheSignal } from "./cache.ts";
+import { findNthTextElement } from "./util.ts";
+import { generateSpeech } from "./voice.ts";
 
 way.comp("reader", ({ props: { book } }) => {
   const state = useCacheSignal("state", { section: 0, node: 0 });
   const isPlaying = way.signal(false);
+  const paused = way.signal(false);
+  const loadingAudio = way.signal(true);
   let audioElement: HTMLAudioElement | null = null;
   const player = document.getElementById("player") as HTMLAudioElement;
 
@@ -23,59 +27,58 @@ way.comp("reader", ({ props: { book } }) => {
   const prev = () => stepNode(-1);
 
   function stepNode(x: number): void {
-    const totalNodes = getTotalNodes();
-    const newNode = state.value.node + x;
-
-    if (newNode >= 0 && newNode < totalNodes) {
-      state.value = { ...state.value, node: newNode };
-    }
+    state.value = { ...state.value, node: state.value.node + x };
   }
 
-   const playpause = async () => {
-     isPlaying.value = !isPlaying.value;
+  const playpause = () => {
+    isPlaying.value = !isPlaying.value;
 
-     if (isPlaying.value) {
-       read();
-     } else {
-       if (audioElement) {
-         audioElement.pause();
-         audioElement.currentTime = 0;
-       }
-     }
-   };
+    if (isPlaying.value) {
+      if (paused.value && audioElement) {
+        audioElement.play();
+        paused.value = false;
+      } else if (audioElement && !loadingAudio.value) {
+        play();
+      }
+    } else {
+      if (audioElement) {
+        audioElement.pause();
+        paused.value = true;
+      }
+    }
+  };
 
-   async function read() {
-     if (!epub) return;
-
-     const nthText = findNthTextElement(epub, state.value.node);
-     if (!nthText) return;
-     
-     console.log("Found nth text:", nthText);
-     audioElement = await generateSpeech(nthText);
-     audioElement.play();
-   }
-
-  function getTotalSections(): number {
-    return book?.value?.spine?.length || 0;
+  async function play() {
+    if (audioElement) {
+      audioElement.play();
+    }
   }
 
   const epub = document.getElementById("epub");
 
-  way.effect(() => {
+  way.effect(async () => {
     if (!book?.value || !epub) return;
 
-    const loadSection = async () => {
-      const s = book.value.spine.get(state.value.section);
-      const doc = await s?.load(book.value.load.bind(book.value));
+    const s = book.value.spine.get(state.value.section);
+    const doc = await s?.load(book.value.load.bind(book.value));
 
-      const body = doc.querySelector("body")?.firstElementChild;
-      if (!body) return;
-      const contents = body.cloneNode(true);
+    const body = doc.querySelector("body")?.firstElementChild;
+    if (!body) return;
+    const contents = body.cloneNode(true);
 
-      epub?.replaceChildren(contents);
-    };
+    epub?.replaceChildren(contents);
 
-    loadSection();
+    loadingAudio.value = true;
+    const nthText = findNthTextElement(epub, state.value.node);
+    console.log("x", state.value, nthText);
+    if (!nthText) {
+      loadingAudio.value = false;
+      return;
+    }
+
+    console.log("Found nth text:", nthText);
+    audioElement = await generateSpeech(nthText);
+    loadingAudio.value = false;
   });
 
   return {
@@ -83,6 +86,8 @@ way.comp("reader", ({ props: { book } }) => {
     next,
     prev,
     isPlaying,
+    paused,
+    loadingAudio,
     playpause,
   };
 });
