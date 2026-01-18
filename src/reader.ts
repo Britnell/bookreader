@@ -1,33 +1,42 @@
 import way from "wayy";
 import { useCacheSignal } from "./cache.ts";
-import { findNthTextElement } from "./util.ts";
+import { getAllPTags } from "./util.ts";
 import { generateSpeech } from "./voice.ts";
 
 way.comp("reader", ({ props: { book } }) => {
-  const state = useCacheSignal("state", { section: 0, node: 0 });
+  const state = useCacheSignal("state", { section: 0, pIndex: 0 });
   const isPlaying = way.signal(false);
   const paused = way.signal(false);
   const loadingAudio = way.signal(true);
   let audioElement: HTMLAudioElement | null = null;
-  const player = document.getElementById("player") as HTMLAudioElement;
+  let allPTags: Element[] = [];
 
   const onkey = (ev: KeyboardEvent) => {
     const key = ev.key;
     if (key === "ArrowLeft") prev();
     if (key === "ArrowRight") next();
-    if (key === "ArrowUp") prevNode();
-    if (key === "ArrowDown") nextNode();
   };
 
   window.addEventListener("keydown", onkey);
 
-  const step = (x: number) =>
-    (state.value = { ...state.value, section: state.value.section + x });
   const next = () => stepNode(1);
   const prev = () => stepNode(-1);
 
   function stepNode(x: number): void {
-    state.value = { ...state.value, node: state.value.node + x };
+    const newIndex = state.value.pIndex + x;
+    console.log({newIndex});
+    
+    if(newIndex < 0) {
+      // Move to previous section
+      if (state.value.section > 0) {
+        state.value = { section: state.value.section - 1, pIndex: 0 };
+      }
+    } else if (newIndex >= allPTags.length) {
+      // Move to next section
+      state.value = { section: state.value.section + 1, pIndex: 0 };
+    } else {
+      state.value = { ...state.value, pIndex: newIndex };
+    }
   }
 
   const playpause = () => {
@@ -54,32 +63,37 @@ way.comp("reader", ({ props: { book } }) => {
     }
   }
 
-  const epub = document.getElementById("epub");
+   const epub = document.getElementById("epub");
 
-  way.effect(async () => {
-    if (!book?.value || !epub) return;
+   way.effect(async () => {
+     if (!book?.value || !epub) return;
 
-    const s = book.value.spine.get(state.value.section);
-    const doc = await s?.load(book.value.load.bind(book.value));
+     const s = book.value.spine.get(state.value.section);
+     const doc = await s?.load(book.value.load.bind(book.value));
 
-    const body = doc.querySelector("body")?.firstElementChild;
-    if (!body) return;
-    const contents = body.cloneNode(true);
+     const body = doc.querySelector("body")?.firstElementChild;
+     if (!body) return;
+     const contents = body.cloneNode(true);
 
-    epub?.replaceChildren(contents);
+     epub?.replaceChildren(contents);
 
-    loadingAudio.value = true;
-    const nthText = findNthTextElement(epub, state.value.node);
-    console.log("x", state.value, nthText);
-    if (!nthText) {
-      loadingAudio.value = false;
-      return;
-    }
+     loadingAudio.value = true;
+     
+     // Get all p tags from the current section
+     allPTags = getAllPTags(epub);
+     
+     const currentPTag = allPTags[state.value.pIndex];
+     console.log("Current section:", state.value.section, "P index:", state.value.pIndex, "P tag:", currentPTag);
+     
+     if (!currentPTag) {
+       loadingAudio.value = false;
+       return;
+     }
 
-    console.log("Found nth text:", nthText);
-    audioElement = await generateSpeech(nthText);
-    loadingAudio.value = false;
-  });
+     console.log("Found P tag:", currentPTag.textContent);
+     audioElement = await generateSpeech(currentPTag.textContent || "");
+     loadingAudio.value = false;
+   });
 
   return {
     state,

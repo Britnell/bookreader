@@ -24,6 +24,7 @@
       </section>
       <article x-else>
         <h2 x-text="title.value || 'epub'"></h2>
+        <button @click="changeBook()">Change Book</button>
         <div x-comp="reader" x-props="{book}">
           <button
             @click="playpause()"

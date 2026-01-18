@@ -68,3 +68,15 @@ export async function retrieveFileFromDB(
     getRequest.onerror = () => reject(getRequest.error);
   });
 }
+
+export async function deleteFileFromDB(key: string): Promise<void> {
+  const db = await openDB();
+  const transaction = db.transaction(STORE_NAME, "readwrite");
+  const store = transaction.objectStore(STORE_NAME);
+
+  return new Promise((resolve, reject) => {
+    const deleteRequest = store.delete(key);
+    deleteRequest.onsuccess = () => resolve();
+    deleteRequest.onerror = () => reject(deleteRequest.error);
+  });
+}

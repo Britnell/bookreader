@@ -25,40 +25,9 @@ export async function generateSpeech(
     );
   }
 
-  // Create MediaSource for streaming playback
-  const mediaSource = new MediaSource();
+  const blob = await response.blob();
   const audio = new Audio();
-  audio.src = URL.createObjectURL(mediaSource);
-
-  const reader = response.body!.getReader();
-  let sourceBuffer: SourceBuffer;
-
-  // Setup happens asynchronously, doesn't block returning
-  mediaSource.addEventListener("sourceopen", () => {
-    sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-
-    const appendNextChunk = async () => {
-      try {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          mediaSource.endOfStream();
-          return;
-        }
-
-        sourceBuffer.appendBuffer(value);
-      } catch (error) {
-        mediaSource.endOfStream("network");
-      }
-    };
-
-    sourceBuffer.addEventListener("update", async () => {
-      await appendNextChunk();
-    });
-
-    // Start appending first chunk
-    appendNextChunk();
-  });
+  audio.src = URL.createObjectURL(blob);
 
   return audio;
 }
@@ -74,36 +43,4 @@ export async function getVoices(): Promise<string[]> {
 
   const data = await response.json();
   return data.voices || [];
-}
-
-export async function createAudioNode(
-  arrayBuffer: ArrayBuffer,
-): Promise<AudioBufferSourceNode> {
-  return new Promise((resolve, reject) => {
-    const audioContext = new (window.AudioContext ||
-      (window as any).webkitAudioContext)();
-
-    audioContext.decodeAudioData(
-      arrayBuffer.slice(0),
-      (audioBuffer) => {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        resolve(source);
-      },
-      (error) => {
-        reject(new Error(`Audio decoding failed: ${error}`));
-      },
-    );
-  });
-}
-
-export async function playAudioBuffer(arrayBuffer: ArrayBuffer): Promise<void> {
-  const source = await createAudioNode(arrayBuffer);
-  return new Promise((resolve) => {
-    source.onended = () => {
-      resolve();
-    };
-    source.start(0);
-  });
 }

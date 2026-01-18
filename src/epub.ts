@@ -1,6 +1,6 @@
 import way from "wayy";
 import ePub from "epubjs";
-import { useCacheSignal, storeFileInDB, retrieveFileFromDB } from "./cache.ts";
+import { useCacheSignal, storeFileInDB, retrieveFileFromDB, deleteFileFromDB } from "./cache.ts";
 
 way.comp("epub", () => {
   const loaded = way.signal(false);
@@ -11,6 +11,8 @@ way.comp("epub", () => {
     const newBook = ePub(arrayBuffer);
     await newBook.ready;
 
+    console.log(newBook);
+    
     const metadata = await newBook.loaded.metadata;
     title.value = metadata.title;
     book.value = newBook;
@@ -45,6 +47,13 @@ way.comp("epub", () => {
     await loadBookFromArrayBuffer(arrayBuffer);
   };
 
-  return { loaded, title, book, fileSelect };
+  const changeBook = async () => {
+    await deleteFileFromDB("currentBook");
+    book.value = null;
+    title.value = "";
+    loaded.value = false;
+  };
+
+  return { loaded, title, book, fileSelect, changeBook };
 });
 
