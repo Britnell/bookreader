@@ -1,9 +1,10 @@
 import way from "wayy";
-import { useCacheSignal } from "./cache.ts";
+import { useCachedVar } from "./cache.ts";
 import { generateSpeech } from "./kokoro.ts";
 
 way.comp("reader", ({ props: { book } }) => {
-  const state = useCacheSignal("state", { section: 0, pIndex: 0 });
+  const section = useCachedVar("section", 0);
+  const pIndex = useCachedVar("pIndex", 0);
   const isPlaying = way.signal(false);
   const paused = way.signal(false);
   const loadingAudio = way.signal(true);
@@ -18,40 +19,42 @@ way.comp("reader", ({ props: { book } }) => {
 
   window.addEventListener("keydown", onkey);
 
-  const next = async () => {
-    // pause current if playing and remove ended listener
-    if (currAudio && isPlaying.value) {
-      currAudio.pause();
-      currAudio.removeEventListener("ended", next);
-    }
-    stepNode(1);
-    currAudio = nextAudio;
-    if (currAudio && isPlaying.value) {
-      attachAudioEndedListener();
-      currAudio.play();
-    }
-    const nextIndex = state.value.pIndex + 1;
-    nextAudio = await loadAudioForPTag(nextIndex);
-  };
+   const next = async () => {
+     // pause current if playing and remove ended listener
+     if (currAudio && isPlaying.value) {
+       currAudio.pause();
+       currAudio.removeEventListener("ended", next);
+     }
+     stepNode(1);
+     currAudio = nextAudio;
+     if (currAudio && isPlaying.value) {
+       attachAudioEndedListener();
+       currAudio.play();
+     }
+     const nextIndex = pIndex.value + 1;
+     nextAudio = await loadAudioForPTag(nextIndex);
+   };
 
   const prev = () => stepNode(-1);
 
-  function stepNode(x: number): void {
-    const newIndex = state.value.pIndex + x;
-    const pTagCount = epub?.querySelectorAll("p").length || 0;
+   function stepNode(x: number): void {
+     const newIndex = pIndex.value + x;
+     const pTagCount = epub?.querySelectorAll("p").length || 0;
 
-    if (newIndex < 0) {
-      // Move to previous section
-      if (state.value.section > 0) {
-        state.value = { section: state.value.section - 1, pIndex: 0 };
-      }
-    } else if (newIndex >= pTagCount) {
-      // Move to next section
-      state.value = { section: state.value.section + 1, pIndex: 0 };
-    } else {
-      state.value = { ...state.value, pIndex: newIndex };
-    }
-  }
+     if (newIndex < 0) {
+       // Move to previous section
+       if (section.value > 0) {
+         section.value = section.value - 1;
+         pIndex.value = 0;
+       }
+     } else if (newIndex >= pTagCount) {
+       // Move to next section
+       section.value = section.value + 1;
+       pIndex.value = 0;
+     } else {
+       pIndex.value = newIndex;
+     }
+   }
 
   const playpause = () => {
     if (isPlaying.value) {
@@ -88,47 +91,42 @@ way.comp("reader", ({ props: { book } }) => {
     return generateSpeech(pTag.textContent || "");
   }
 
-  const onMounted = async () => {
-    loadingAudio.value = true;
-    const curr = state.value.pIndex;
-    currAudio = await loadAudioForPTag(curr);
-    loadingAudio.value = false;
+   const onMounted = async () => {
+     loadingAudio.value = true;
+     const curr = pIndex.value;
+     currAudio = await loadAudioForPTag(curr);
+     loadingAudio.value = false;
 
-    const nextIndex = curr + 1;
-    nextAudio = await loadAudioForPTag(nextIndex);
-  };
+     const nextIndex = curr + 1;
+     nextAudio = await loadAudioForPTag(nextIndex);
+   };
 
-  const currentSection = way.signal(state.value.section);
+   way.effect(() => {
+     if (!book?.value || !epub) return;
 
-  way.effect(() => {
-    if (!book?.value || !epub) return;
+     (async () => {
+       const s = book.value.spine.get(section.value);
+       const doc = await s?.load(book.value.load.bind(book.value));
 
-    (async () => {
-      const s = book.value.spine.get(currentSection.value);
-      const doc = await s?.load(book.value.load.bind(book.value));
+       console.log("load");
 
-      console.log("load");
+       const body = doc.querySelector("body");
+       if (!body) return;
+       const contents = body.cloneNode(true);
+       epub?.replaceChildren(contents);
 
-      const body = doc.querySelector("body");
-      if (!body) return;
-      const contents = body.cloneNode(true);
-      epub?.replaceChildren(contents);
+       onMounted();
+     })();
+   });
 
-      onMounted();
-    })();
-  });
-
-  way.effect(() => {
-    currentSection.value = state.value.section;
-  });
-
-  return {
-    state,
-    next,
-    prev,
-    isPlaying,
-    paused,
-    loadingAudio,
-    playpause,
-  };
+   return {
+     section,
+     pIndex,
+     next,
+     prev,
+     isPlaying,
+     paused,
+     loadingAudio,
+     playpause,
+   };
 });

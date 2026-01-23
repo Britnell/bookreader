@@ -1,12 +1,35 @@
 import way from "wayy";
 
-export function useCacheSignal<T extends object>(key: string, defaultValue: T) {
+export function useCachedObject<T extends object>(key: string, defaultValue: T) {
   // Try to load from localStorage on initialization
   const cached = localStorage.getItem(key);
   let initialValue = defaultValue;
   if (cached) {
     try {
       initialValue = JSON.parse(cached);
+    } catch {
+      // If JSON parse fails, use default value
+    }
+  }
+
+  // Create the signal with the initial value
+  const signal = way.signal<T>(initialValue);
+
+  // Watch for changes and save to localStorage
+  way.effect(() => {
+    localStorage.setItem(key, JSON.stringify(signal.value));
+  });
+
+  return signal;
+}
+
+export function useCachedVar<T>(key: string, defaultValue: T) {
+  // Try to load from localStorage on initialization
+  const cached = localStorage.getItem(key);
+  let initialValue = defaultValue;
+  if (cached) {
+    try {
+      initialValue = JSON.parse(cached) as T;
     } catch {
       // If JSON parse fails, use default value
     }
