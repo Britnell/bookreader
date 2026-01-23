@@ -13,6 +13,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
+    "@gradio/client": "^2.0.3",
     "epubjs": "^0.3.93",
     "wayy": "^0.1.5"
   }

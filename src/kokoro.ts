@@ -1,5 +1,3 @@
-import way from "wayy";
-
 export async function generateSpeech(
   text: string,
   voice: string = "alloy",

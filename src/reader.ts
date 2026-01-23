@@ -1,6 +1,6 @@
 import way from "wayy";
 import { useCacheSignal } from "./cache.ts";
-import { generateSpeech } from "./voice.ts";
+import { generateSpeech } from "./kokoro.ts";
 
 way.comp("reader", ({ props: { book } }) => {
   const state = useCacheSignal("state", { section: 0, pIndex: 0 });
@@ -10,118 +10,120 @@ way.comp("reader", ({ props: { book } }) => {
   let currAudio: HTMLAudioElement | null = null;
   let nextAudio: HTMLAudioElement | null = null;
 
-   const onkey = (ev: KeyboardEvent) => {
-     const key = ev.key;
-     if (key === "ArrowLeft") prev();
-     if (key === "ArrowRight") next();
-   };
+  const onkey = (ev: KeyboardEvent) => {
+    const key = ev.key;
+    if (key === "ArrowLeft") prev();
+    if (key === "ArrowRight") next();
+  };
 
-   window.addEventListener("keydown", onkey);
+  window.addEventListener("keydown", onkey);
 
-    const next = async () => {
-     // pause current if playing 
-     if (currAudio && isPlaying.value) {
-       currAudio.pause();
-     }
-      stepNode(1);
-      currAudio = nextAudio;
-      if (currAudio) {
-        attachAudioEndedListener();
-        currAudio.play();
+  const next = async () => {
+    // pause current if playing
+    if (currAudio && isPlaying.value) {
+      currAudio.pause();
+    }
+    stepNode(1);
+    currAudio = nextAudio;
+    if (currAudio) {
+      attachAudioEndedListener();
+      currAudio.play();
+    }
+    const nextIndex = state.value.pIndex + 1;
+    nextAudio = await loadAudioForPTag(nextIndex);
+  };
+
+  const prev = () => stepNode(-1);
+
+  function stepNode(x: number): void {
+    const newIndex = state.value.pIndex + x;
+    const pTagCount = epub?.querySelectorAll("p").length || 0;
+
+    if (newIndex < 0) {
+      // Move to previous section
+      if (state.value.section > 0) {
+        state.value = { section: state.value.section - 1, pIndex: 0 };
       }
-      const nextIndex = state.value.pIndex + 1;
-      nextAudio = await loadAudioForPTag(nextIndex);
-    };
+    } else if (newIndex >= pTagCount) {
+      // Move to next section
+      state.value = { section: state.value.section + 1, pIndex: 0 };
+    } else {
+      state.value = { ...state.value, pIndex: newIndex };
+    }
+  }
 
-   const prev = () => stepNode(-1);
+  const playpause = () => {
+    isPlaying.value = !isPlaying.value;
 
-   function stepNode(x: number): void {
-     const newIndex = state.value.pIndex + x;
-     const pTagCount = epub?.querySelectorAll("p").length || 0;
-     
-     if(newIndex < 0) {
-       // Move to previous section
-       if (state.value.section > 0) {
-         state.value = { section: state.value.section - 1, pIndex: 0 };
-       }
-     } else if (newIndex >= pTagCount) {
-       // Move to next section
-       state.value = { section: state.value.section + 1, pIndex: 0 };
-     } else {
-       state.value = { ...state.value, pIndex: newIndex };
-     }
-   }
-
-   const playpause = () => {
-     isPlaying.value = !isPlaying.value;
-
-     if (isPlaying.value) {
-       if (paused.value && currAudio) {
-         currAudio.play();
-         paused.value = false;
-       } else if (currAudio && !loadingAudio.value) {
-         play();
-       }
-     } else {
-       if (currAudio) {
-         currAudio.pause();
-         paused.value = true;
-       }
-     }
-   };
-
-   const attachAudioEndedListener = () => {
-     if (currAudio) {
-       currAudio.addEventListener("ended", next);
-     }
-   };
-
-    async function play() {
-      if (currAudio) {
-        attachAudioEndedListener();
+    if (isPlaying.value) {
+      if (paused.value && currAudio) {
         currAudio.play();
+        paused.value = false;
+      } else if (currAudio && !loadingAudio.value) {
+        play();
+      }
+    } else {
+      if (currAudio) {
+        currAudio.pause();
+        paused.value = true;
       }
     }
+  };
 
-   const epub = document.getElementById("epub");
+  const attachAudioEndedListener = () => {
+    if (currAudio) {
+      currAudio.addEventListener("ended", next);
+    }
+  };
 
-   async function loadAudioForPTag(pIndex: number): Promise<HTMLAudioElement | null> {
-     const pTag = epub?.querySelectorAll("p")[pIndex];
-     if (!pTag) return null;
-     return generateSpeech(pTag.textContent || "");
-   }
+  async function play() {
+    if (currAudio) {
+      attachAudioEndedListener();
+      currAudio.play();
+    }
+  }
 
-   const onMounted = async () => {
-     loadingAudio.value = true;
-     const curr = state.value.pIndex;
-     currAudio = await loadAudioForPTag(curr);
-     loadingAudio.value = false;
+  const epub = document.getElementById("epub");
 
-     const nextIndex = curr + 1;
-     nextAudio = await loadAudioForPTag(nextIndex);
-   };
+  async function loadAudioForPTag(
+    pIndex: number,
+  ): Promise<HTMLAudioElement | null> {
+    const pTag = epub?.querySelectorAll("p")[pIndex];
+    if (!pTag) return null;
+    return generateSpeech(pTag.textContent || "");
+  }
 
-     way.effect(async () => {
-       if (!book?.value || !epub) return;
+  const onMounted = async () => {
+    loadingAudio.value = true;
+    const curr = state.value.pIndex;
+    currAudio = await loadAudioForPTag(curr);
+    loadingAudio.value = false;
 
-       const s = book.value.spine.get(state.value.section);
-       const doc = await s?.load(book.value.load.bind(book.value));
+    const nextIndex = curr + 1;
+    nextAudio = await loadAudioForPTag(nextIndex);
+  };
 
-       const body = doc.querySelector("body")
-       if (!body) return;
-       const contents = body.cloneNode(true);
-       epub?.replaceChildren(contents);
+  way.effect(async () => {
+    if (!book?.value || !epub) return;
 
-       onMounted()
-     });
+    const s = book.value.spine.get(state.value.section);
+    const doc = await s?.load(book.value.load.bind(book.value));
 
-    return {
-      state,
-      next,
-      prev,
-      isPlaying,
-      paused,
-      loadingAudio,
-      playpause,
-    };
+    const body = doc.querySelector("body");
+    if (!body) return;
+    const contents = body.cloneNode(true);
+    epub?.replaceChildren(contents);
+
+    onMounted();
+  });
+
+  return {
+    state,
+    next,
+    prev,
+    isPlaying,
+    paused,
+    loadingAudio,
+    playpause,
+  };
 });
