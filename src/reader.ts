@@ -12,9 +12,11 @@ way.comp("reader", ({ props: { book } }) => {
   const loadingAudio = way.signal(true);
   const voices = way.signal<string[]>([]);
   const speedOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
-  let currAudio: HTMLAudioElement | null = null;
-  let nextAudio: HTMLAudioElement | null = null;
-  let previousPIndex = 0;
+   let currAudio: HTMLAudioElement | null = null;
+   let nextAudio: HTMLAudioElement | null = null;
+   let previousPIndex = 0;
+   let previousSpeed = speed.value;
+   let previousVoice = selectedVoice.value;
 
   const onkey = (ev: KeyboardEvent) => {
     const key = ev.key;
@@ -187,11 +189,16 @@ way.comp("reader", ({ props: { book } }) => {
     highlightCurrentParagraph();
   });
 
-  way.effect(() => {
-    speed.value; // Track changes to speed
-    selectedVoice.value; // Track changes to selectedVoice
-    regenerateAudio();
-  });
+   way.effect(() => {
+     const currSpeed = speed.value;
+     const currVoice = selectedVoice.value;
+     
+     if (currSpeed !== previousSpeed || currVoice !== previousVoice) {
+       previousSpeed = currSpeed;
+       previousVoice = currVoice;
+       regenerateAudio();
+     }
+   });
 
   way.effect(() => {
     if (!book?.value || !epub) return;
