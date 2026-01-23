@@ -1,6 +1,6 @@
 import way from "wayy";
 import { useCachedVar } from "./cache.ts";
-import { generateSpeech } from "./kokoro.ts";
+import { generateSpeech, getVoices } from "./kokoro.ts";
 
 way.comp("reader", ({ props: { book } }) => {
   const section = useCachedVar("section", 0);
@@ -8,6 +8,7 @@ way.comp("reader", ({ props: { book } }) => {
   const isPlaying = way.signal(false);
   const paused = way.signal(false);
   const loadingAudio = way.signal(true);
+  const voices = way.signal<string[]>([]);
   let currAudio: HTMLAudioElement | null = null;
   let nextAudio: HTMLAudioElement | null = null;
 
@@ -19,42 +20,42 @@ way.comp("reader", ({ props: { book } }) => {
 
   window.addEventListener("keydown", onkey);
 
-   const next = async () => {
-     // pause current if playing and remove ended listener
-     if (currAudio && isPlaying.value) {
-       currAudio.pause();
-       currAudio.removeEventListener("ended", next);
-     }
-     stepNode(1);
-     currAudio = nextAudio;
-     if (currAudio && isPlaying.value) {
-       attachAudioEndedListener();
-       currAudio.play();
-     }
-     const nextIndex = pIndex.value + 1;
-     nextAudio = await loadAudioForPTag(nextIndex);
-   };
+  const next = async () => {
+    // pause current if playing and remove ended listener
+    if (currAudio && isPlaying.value) {
+      currAudio.pause();
+      currAudio.removeEventListener("ended", next);
+    }
+    stepNode(1);
+    currAudio = nextAudio;
+    if (currAudio && isPlaying.value) {
+      attachAudioEndedListener();
+      currAudio.play();
+    }
+    const nextIndex = pIndex.value + 1;
+    nextAudio = await loadAudioForPTag(nextIndex);
+  };
 
   const prev = () => stepNode(-1);
 
-   function stepNode(x: number): void {
-     const newIndex = pIndex.value + x;
-     const pTagCount = epub?.querySelectorAll("p").length || 0;
+  function stepNode(x: number): void {
+    const newIndex = pIndex.value + x;
+    const pTagCount = epub?.querySelectorAll("p").length || 0;
 
-     if (newIndex < 0) {
-       // Move to previous section
-       if (section.value > 0) {
-         section.value = section.value - 1;
-         pIndex.value = 0;
-       }
-     } else if (newIndex >= pTagCount) {
-       // Move to next section
-       section.value = section.value + 1;
-       pIndex.value = 0;
-     } else {
-       pIndex.value = newIndex;
-     }
-   }
+    if (newIndex < 0) {
+      // Move to previous section
+      if (section.value > 0) {
+        section.value = section.value - 1;
+        pIndex.value = 0;
+      }
+    } else if (newIndex >= pTagCount) {
+      // Move to next section
+      section.value = section.value + 1;
+      pIndex.value = 0;
+    } else {
+      pIndex.value = newIndex;
+    }
+  }
 
   const playpause = () => {
     if (isPlaying.value) {
@@ -91,7 +92,7 @@ way.comp("reader", ({ props: { book } }) => {
     return generateSpeech(pTag.textContent || "");
   }
 
-   const onMounted = async () => {
+   const render = async () => {
      loadingAudio.value = true;
      const curr = pIndex.value;
      currAudio = await loadAudioForPTag(curr);
@@ -101,32 +102,42 @@ way.comp("reader", ({ props: { book } }) => {
      nextAudio = await loadAudioForPTag(nextIndex);
    };
 
-   way.effect(() => {
-     if (!book?.value || !epub) return;
-
-     (async () => {
-       const s = book.value.spine.get(section.value);
-       const doc = await s?.load(book.value.load.bind(book.value));
-
-       console.log("load");
-
-       const body = doc.querySelector("body");
-       if (!body) return;
-       const contents = body.cloneNode(true);
-       epub?.replaceChildren(contents);
-
-       onMounted();
-     })();
-   });
-
-   return {
-     section,
-     pIndex,
-     next,
-     prev,
-     isPlaying,
-     paused,
-     loadingAudio,
-     playpause,
+   const onMounted = async () => {
+     try {
+       const availableVoices = await getVoices();
+       voices.value = availableVoices;
+     } catch (error) {
+       console.error("Failed to fetch voices:", error);
+     }
    };
+  way.effect(() => {
+    if (!book?.value || !epub) return;
+
+    (async () => {
+      const s = book.value.spine.get(section.value);
+      const doc = await s?.load(book.value.load.bind(book.value));
+
+      console.log("load");
+
+      const body = doc.querySelector("body");
+      if (!body) return;
+      const contents = body.cloneNode(true);
+      epub?.replaceChildren(contents);
+
+      render();
+    })();
+  });
+
+  return {
+    section,
+    pIndex,
+    next,
+    prev,
+    onMounted,
+    isPlaying,
+    paused,
+    loadingAudio,
+    playpause,
+    voices,
+  };
 });

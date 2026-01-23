@@ -32,9 +32,9 @@
             :disabled="loadingAudio.value"
           ></button>
           <button @click="prev()">Previous</button>
-          <span>
-            {state.value.pIndex}
-          </span>
+           <span>
+             {pIndex.value}
+           </span>
           <button @click="next()">Next</button>
         </div>
         <audio id="player"></audio>
