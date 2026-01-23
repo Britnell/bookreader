@@ -1,6 +1,11 @@
 import way from "wayy";
 import ePub from "epubjs";
-import { useCacheSignal, storeFileInDB, retrieveFileFromDB, deleteFileFromDB } from "./cache.ts";
+import {
+  storeFileInDB,
+  retrieveFileFromDB,
+  deleteFileFromDB,
+} from "./cache.ts";
+// import { readXMLFromEPUB } from "./xml.ts";
 
 way.comp("epub", () => {
   const loaded = way.signal(false);
@@ -8,6 +13,9 @@ way.comp("epub", () => {
   const book = way.signal<any>(null);
 
   const loadBookFromArrayBuffer = async (arrayBuffer: ArrayBuffer) => {
+    // const xml = await readXMLFromEPUB(arrayBuffer);
+    // console.log("Parsed XML:", xml);
+
     const newBook = ePub(arrayBuffer);
     await newBook.ready;
 
@@ -53,4 +61,3 @@ way.comp("epub", () => {
 
   return { loaded, title, book, fileSelect, changeBook };
 });
-
