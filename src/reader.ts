@@ -19,13 +19,14 @@ way.comp("reader", ({ props: { book } }) => {
   window.addEventListener("keydown", onkey);
 
   const next = async () => {
-    // pause current if playing
+    // pause current if playing and remove ended listener
     if (currAudio && isPlaying.value) {
       currAudio.pause();
+      currAudio.removeEventListener("ended", next);
     }
     stepNode(1);
     currAudio = nextAudio;
-    if (currAudio) {
+    if (currAudio && isPlaying.value) {
       attachAudioEndedListener();
       currAudio.play();
     }
@@ -53,19 +54,20 @@ way.comp("reader", ({ props: { book } }) => {
   }
 
   const playpause = () => {
-    isPlaying.value = !isPlaying.value;
-
     if (isPlaying.value) {
-      if (paused.value && currAudio) {
-        currAudio.play();
-        paused.value = false;
-      } else if (currAudio && !loadingAudio.value) {
-        play();
-      }
-    } else {
+      // Pause: just pause the current audio
       if (currAudio) {
         currAudio.pause();
         paused.value = true;
+      }
+      isPlaying.value = false;
+    } else {
+      // Play: resume if paused, or start playing
+      if (currAudio) {
+        attachAudioEndedListener();
+        currAudio.play();
+        paused.value = false;
+        isPlaying.value = true;
       }
     }
   };
@@ -75,13 +77,6 @@ way.comp("reader", ({ props: { book } }) => {
       currAudio.addEventListener("ended", next);
     }
   };
-
-  async function play() {
-    if (currAudio) {
-      attachAudioEndedListener();
-      currAudio.play();
-    }
-  }
 
   const epub = document.getElementById("epub");
 
@@ -103,18 +98,28 @@ way.comp("reader", ({ props: { book } }) => {
     nextAudio = await loadAudioForPTag(nextIndex);
   };
 
-  way.effect(async () => {
+  const currentSection = way.signal(state.value.section);
+
+  way.effect(() => {
     if (!book?.value || !epub) return;
 
-    const s = book.value.spine.get(state.value.section);
-    const doc = await s?.load(book.value.load.bind(book.value));
+    (async () => {
+      const s = book.value.spine.get(currentSection.value);
+      const doc = await s?.load(book.value.load.bind(book.value));
 
-    const body = doc.querySelector("body");
-    if (!body) return;
-    const contents = body.cloneNode(true);
-    epub?.replaceChildren(contents);
+      console.log("load");
 
-    onMounted();
+      const body = doc.querySelector("body");
+      if (!body) return;
+      const contents = body.cloneNode(true);
+      epub?.replaceChildren(contents);
+
+      onMounted();
+    })();
+  });
+
+  way.effect(() => {
+    currentSection.value = state.value.section;
   });
 
   return {
