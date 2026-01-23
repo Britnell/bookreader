@@ -12,6 +12,7 @@ way.comp("reader", ({ props: { book } }) => {
   const voices = way.signal<string[]>([]);
   let currAudio: HTMLAudioElement | null = null;
   let nextAudio: HTMLAudioElement | null = null;
+  let previousPIndex = 0;
 
   const onkey = (ev: KeyboardEvent) => {
     const key = ev.key;
@@ -85,13 +86,13 @@ way.comp("reader", ({ props: { book } }) => {
 
   const epub = document.getElementById("epub");
 
-  async function loadAudioForPTag(
-    pIndex: number,
-  ): Promise<HTMLAudioElement | null> {
-    const pTag = epub?.querySelectorAll("p")[pIndex];
-    if (!pTag) return null;
-    return generateSpeech(pTag.textContent || "");
-  }
+   async function loadAudioForPTag(
+     pIndex: number,
+   ): Promise<HTMLAudioElement | null> {
+     const pTag = epub?.querySelectorAll("p")[pIndex];
+     if (!pTag) return null;
+     return generateSpeech(pTag.textContent || "", selectedVoice.value);
+   }
 
   const render = async () => {
     loadingAudio.value = true;
@@ -107,16 +108,39 @@ way.comp("reader", ({ props: { book } }) => {
     console.log("mount");
   };
 
-  way.effect(async () => {
-    try {
-      const availableVoices = await getVoices();
-      console.log(availableVoices);
+  way.effect(() => {
+     (async () => {
+       try {
+         const availableVoices = await getVoices();
+         console.log(availableVoices);
 
-      voices.value = availableVoices;
-    } catch (error) {
-      console.error("Failed to fetch voices:", error);
-    }
-  });
+         voices.value = availableVoices;
+       } catch (error) {
+         console.error("Failed to fetch voices:", error);
+       }
+     })();
+   });
+
+   way.effect(() => {
+     const curr = pIndex.value;
+     const pTags = epub?.querySelectorAll("p");
+     if (!pTags) return;
+
+     // Remove highlight from previous paragraph
+     if (previousPIndex < pTags.length) {
+       const prevTag = pTags[previousPIndex];
+       prevTag?.classList.remove("highlight");
+     }
+
+     // Add highlight to current paragraph
+     if (curr < pTags.length) {
+       const currTag = pTags[curr];
+       currTag?.classList.add("highlight");
+       currTag?.scrollIntoView({ behavior: "smooth", block: "center" });
+     }
+
+     previousPIndex = curr;
+   });
 
   way.effect(() => {
     if (!book?.value || !epub) return;
