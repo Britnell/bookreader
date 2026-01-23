@@ -9,33 +9,51 @@
     <script src="/src/way-inline.js"></script>
     <script type="module" src="/src/main.ts"></script>
   </head>
-  <body>
-    <header>bookreader</header>
-    <main x-comp="epub">
-      <h1>bookreader</h1>
-      <section x-show="!book.value">
-        <input
-          name="src"
-          id="src"
-          type="file"
-          accept=".epub"
-          @change="fileSelect($event)"
-        />
-      </section>
-      <article x-else>
-        <h2 x-text="title.value || 'epub'"></h2>
+  <body x-comp="epub">
+    <div x-comp="reader" x-props="{book}">
+      <header class="">
+        bookreader
         <button @click="changeBook()">Change Book</button>
-        <div x-comp="reader" x-props="{book}">
+        <button @click="openMenu()">Menu</button>
+      </header>
+
+      <dialog
+        id="menu-dialog"
+        @click="(e) => e.target === e.currentTarget && closeMenu()"
+      >
+        <h3>Settings</h3>
+        <label>
+          Voice:
           <select x-model="selectedVoice">
             <template x-for="voice in voices.value">
               <option x-text="voice" :value="voice"></option>
             </template>
           </select>
-           <select x-model="speed">
-             <template x-for="speedOption in speedOptions">
-               <option x-text="speedOption + 'x'" :value="speedOption"></option>
-             </template>
-           </select>
+        </label>
+        <label>
+          Speed:
+          <select x-model="speed">
+            <template x-for="speedOption in speedOptions">
+              <option x-text="speedOption + 'x'" :value="speedOption"></option>
+            </template>
+          </select>
+        </label>
+        <button @click="closeMenu()">Close</button>
+      </dialog>
+
+      <main x-comp="epub">
+        <h1>bookreader</h1>
+        <section x-show="!book.value">
+          <input
+            name="src"
+            id="src"
+            type="file"
+            accept=".epub"
+            @change="fileSelect($event)"
+          />
+        </section>
+        <article x-else>
+          <h2 x-text="title.value || 'epub'"></h2>
           <button
             @click="playpause()"
             x-text="isPlaying.value ? 'Pause' : 'play'"
@@ -44,10 +62,10 @@
           <button @click="prev()">Previous</button>
           <span> {pIndex.value} </span>
           <button @click="next()">Next</button>
-        </div>
-        <audio id="player"></audio>
-        <div id="epub"></div>
-      </article>
-    </main>
+          <audio id="player"></audio>
+          <div id="epub"></div>
+        </article>
+      </main>
+    </div>
   </body>
 </html>

@@ -124,26 +124,40 @@ way.comp("reader", ({ props: { book } }) => {
     }
   };
 
-  const highlightCurrentParagraph = () => {
-    const curr = pIndex.value;
-    const pTags = epub?.querySelectorAll("p");
-    if (!pTags) return;
+   const highlightCurrentParagraph = () => {
+     const curr = pIndex.value;
+     const pTags = epub?.querySelectorAll("p");
+     if (!pTags) return;
 
-    // Remove highlight from previous paragraph
-    if (previousPIndex < pTags.length) {
-      const prevTag = pTags[previousPIndex];
-      prevTag?.classList.remove("highlight");
-    }
+     // Remove highlight from previous paragraph
+     if (previousPIndex < pTags.length) {
+       const prevTag = pTags[previousPIndex];
+       prevTag?.classList.remove("highlight");
+     }
 
-    // Add highlight to current paragraph
-    if (curr < pTags.length) {
-      const currTag = pTags[curr];
-      currTag?.classList.add("highlight");
-      currTag?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+     // Add highlight to current paragraph
+     if (curr < pTags.length) {
+       const currTag = pTags[curr];
+       currTag?.classList.add("highlight");
+       currTag?.scrollIntoView({ behavior: "smooth", block: "center" });
+     }
 
-    previousPIndex = curr;
-  };
+     previousPIndex = curr;
+   };
+
+   const openMenu = () => {
+     const dialog = document.getElementById("menu-dialog") as HTMLDialogElement | null;
+     if (dialog) {
+       dialog.showModal();
+     }
+   };
+
+   const closeMenu = () => {
+     const dialog = document.getElementById("menu-dialog") as HTMLDialogElement | null;
+     if (dialog) {
+       dialog.close();
+     }
+   };
 
   const render = async () => {
     loadingAudio.value = true;
@@ -199,19 +213,21 @@ way.comp("reader", ({ props: { book } }) => {
     })();
   });
 
-  return {
-    section,
-    pIndex,
-    next,
-    prev,
-    onMounted,
-    isPlaying,
-    paused,
-    loadingAudio,
-    playpause,
-    selectedVoice,
-    voices,
-    speed,
-    speedOptions,
-  };
+   return {
+     section,
+     pIndex,
+     next,
+     prev,
+     onMounted,
+     isPlaying,
+     paused,
+     loadingAudio,
+     playpause,
+     selectedVoice,
+     voices,
+     speed,
+     speedOptions,
+     openMenu,
+     closeMenu,
+   };
 });

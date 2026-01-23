@@ -15,7 +15,8 @@
   background-color: yellow;
 }
 
-main {
+main,
+header {
   max-width: 60ch;
   margin: 0 auto;
 }
