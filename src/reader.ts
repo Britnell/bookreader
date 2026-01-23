@@ -6,10 +6,12 @@ way.comp("reader", ({ props: { book } }) => {
   const section = useCachedVar("section", 0);
   const pIndex = useCachedVar("pIndex", 0);
   const selectedVoice = useCachedVar("selectedVoice", "alloy");
+  const speed = useCachedVar("speed", 1.0);
   const isPlaying = way.signal(false);
   const paused = way.signal(false);
   const loadingAudio = way.signal(true);
   const voices = way.signal<string[]>([]);
+  const speedOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
   let currAudio: HTMLAudioElement | null = null;
   let nextAudio: HTMLAudioElement | null = null;
   let previousPIndex = 0;
@@ -18,6 +20,10 @@ way.comp("reader", ({ props: { book } }) => {
     const key = ev.key;
     if (key === "ArrowLeft") prev();
     if (key === "ArrowRight") next();
+    if (key === " ") {
+      ev.preventDefault();
+      playpause();
+    }
   };
 
   window.addEventListener("keydown", onkey);
@@ -86,13 +92,58 @@ way.comp("reader", ({ props: { book } }) => {
 
   const epub = document.getElementById("epub");
 
-   async function loadAudioForPTag(
-     pIndex: number,
-   ): Promise<HTMLAudioElement | null> {
-     const pTag = epub?.querySelectorAll("p")[pIndex];
-     if (!pTag) return null;
-     return generateSpeech(pTag.textContent || "", selectedVoice.value);
-   }
+  async function loadAudioForPTag(
+    pIndex: number,
+  ): Promise<HTMLAudioElement | null> {
+    const pTag = epub?.querySelectorAll("p")[pIndex];
+    if (!pTag) return null;
+    return generateSpeech(
+      pTag.textContent || "",
+      selectedVoice.value,
+      speed.value,
+    );
+  }
+
+  const onMounted = () => {
+    console.log("mount");
+  };
+
+  const regenerateAudio = async () => {
+    const curr = pIndex.value;
+    const nextIndex = curr + 1;
+
+    if (isPlaying.value) {
+      // If playing, only reload next audio at new speed
+      nextAudio = await loadAudioForPTag(nextIndex);
+    } else {
+      // If not playing, reload both current and next audio
+      loadingAudio.value = true;
+      currAudio = await loadAudioForPTag(curr);
+      loadingAudio.value = false;
+      nextAudio = await loadAudioForPTag(nextIndex);
+    }
+  };
+
+  const highlightCurrentParagraph = () => {
+    const curr = pIndex.value;
+    const pTags = epub?.querySelectorAll("p");
+    if (!pTags) return;
+
+    // Remove highlight from previous paragraph
+    if (previousPIndex < pTags.length) {
+      const prevTag = pTags[previousPIndex];
+      prevTag?.classList.remove("highlight");
+    }
+
+    // Add highlight to current paragraph
+    if (curr < pTags.length) {
+      const currTag = pTags[curr];
+      currTag?.classList.add("highlight");
+      currTag?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    previousPIndex = curr;
+  };
 
   const render = async () => {
     loadingAudio.value = true;
@@ -104,43 +155,29 @@ way.comp("reader", ({ props: { book } }) => {
     nextAudio = await loadAudioForPTag(nextIndex);
   };
 
-  const onMounted = () => {
-    console.log("mount");
-  };
+  way.effect(() => {
+    (async () => {
+      try {
+        const availableVoices = await getVoices();
+        console.log(availableVoices);
+
+        voices.value = availableVoices;
+      } catch (error) {
+        console.error("Failed to fetch voices:", error);
+      }
+    })();
+  });
 
   way.effect(() => {
-     (async () => {
-       try {
-         const availableVoices = await getVoices();
-         console.log(availableVoices);
+    pIndex.value; // Track changes to pIndex
+    highlightCurrentParagraph();
+  });
 
-         voices.value = availableVoices;
-       } catch (error) {
-         console.error("Failed to fetch voices:", error);
-       }
-     })();
-   });
-
-   way.effect(() => {
-     const curr = pIndex.value;
-     const pTags = epub?.querySelectorAll("p");
-     if (!pTags) return;
-
-     // Remove highlight from previous paragraph
-     if (previousPIndex < pTags.length) {
-       const prevTag = pTags[previousPIndex];
-       prevTag?.classList.remove("highlight");
-     }
-
-     // Add highlight to current paragraph
-     if (curr < pTags.length) {
-       const currTag = pTags[curr];
-       currTag?.classList.add("highlight");
-       currTag?.scrollIntoView({ behavior: "smooth", block: "center" });
-     }
-
-     previousPIndex = curr;
-   });
+  way.effect(() => {
+    speed.value; // Track changes to speed
+    selectedVoice.value; // Track changes to selectedVoice
+    regenerateAudio();
+  });
 
   way.effect(() => {
     if (!book?.value || !epub) return;
@@ -155,6 +192,10 @@ way.comp("reader", ({ props: { book } }) => {
       epub?.replaceChildren(contents);
 
       render();
+
+      setTimeout(() => {
+        highlightCurrentParagraph();
+      }, 0);
     })();
   });
 
@@ -170,5 +211,7 @@ way.comp("reader", ({ props: { book } }) => {
     playpause,
     selectedVoice,
     voices,
+    speed,
+    speedOptions,
   };
 });
