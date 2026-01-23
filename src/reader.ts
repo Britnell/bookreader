@@ -5,6 +5,7 @@ import { generateSpeech, getVoices } from "./kokoro.ts";
 way.comp("reader", ({ props: { book } }) => {
   const section = useCachedVar("section", 0);
   const pIndex = useCachedVar("pIndex", 0);
+  const selectedVoice = useCachedVar("selectedVoice", "alloy");
   const isPlaying = way.signal(false);
   const paused = way.signal(false);
   const loadingAudio = way.signal(true);
@@ -92,32 +93,37 @@ way.comp("reader", ({ props: { book } }) => {
     return generateSpeech(pTag.textContent || "");
   }
 
-   const render = async () => {
-     loadingAudio.value = true;
-     const curr = pIndex.value;
-     currAudio = await loadAudioForPTag(curr);
-     loadingAudio.value = false;
+  const render = async () => {
+    loadingAudio.value = true;
+    const curr = pIndex.value;
+    currAudio = await loadAudioForPTag(curr);
+    loadingAudio.value = false;
 
-     const nextIndex = curr + 1;
-     nextAudio = await loadAudioForPTag(nextIndex);
-   };
+    const nextIndex = curr + 1;
+    nextAudio = await loadAudioForPTag(nextIndex);
+  };
 
-   const onMounted = async () => {
-     try {
-       const availableVoices = await getVoices();
-       voices.value = availableVoices;
-     } catch (error) {
-       console.error("Failed to fetch voices:", error);
-     }
-   };
+  const onMounted = () => {
+    console.log("mount");
+  };
+
+  way.effect(async () => {
+    try {
+      const availableVoices = await getVoices();
+      console.log(availableVoices);
+
+      voices.value = availableVoices;
+    } catch (error) {
+      console.error("Failed to fetch voices:", error);
+    }
+  });
+
   way.effect(() => {
     if (!book?.value || !epub) return;
 
     (async () => {
       const s = book.value.spine.get(section.value);
       const doc = await s?.load(book.value.load.bind(book.value));
-
-      console.log("load");
 
       const body = doc.querySelector("body");
       if (!body) return;
@@ -138,6 +144,7 @@ way.comp("reader", ({ props: { book } }) => {
     paused,
     loadingAudio,
     playpause,
+    selectedVoice,
     voices,
   };
 });
