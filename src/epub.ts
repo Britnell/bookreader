@@ -57,6 +57,8 @@ way.comp("epub", () => {
     book.value = null;
     title.value = "";
     loaded.value = false;
+    // const el = document.getElementById("epub");
+    // if (el) el.innerHTML = "";
   };
 
   return { loaded, title, book, fileSelect, changeBook };
