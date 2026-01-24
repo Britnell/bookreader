@@ -53,11 +53,10 @@
         </div>
 
         <article x-else class="relative">
-          <h2 class="text-center text-xl font-semibold">
-            {title.value || 'epub'}
-          </h2>
-
           <div class="flex gap-3">
+            <h2 class="text-center text-xl font-semibold">
+              {title.value || 'epub'}
+            </h2>
             <span class="x ml-auto"> Section {section} </span>
             <button class="button" @click="nextSection()">next</button>
             <button class="button" @click="prevSection()">prev</button>
@@ -76,7 +75,13 @@
             </button>
             <button class="button" @click="next()">skip &rarr;</button>
           </div>
-
+          <div class="flex justify-center absolute w-full">
+            <span
+              x-show="loadingAudio.value"
+              class="bg-gray-100 py-1 px-3 rounded-lg"
+              >LOADING...</span
+            >
+          </div>
           <audio id="player"></audio>
           <div id="epub"></div>
         </article>
