@@ -12,8 +12,7 @@ way.comp("reader", ({ props: { book } }) => {
   const loadingAudio = way.signal(true);
   const voices = way.signal<string[]>([]);
   const speedOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5];
-  const audioCache = new Map<number, HTMLAudioElement>();
-  const audioLoading = way.signal(new Map<number, boolean>());
+  const audioCache = new Map<number, HTMLAudioElement | Promise<HTMLAudioElement | null>>();
   let previousPIndex = 0;
 
   const onkey = (ev: KeyboardEvent) => {
@@ -30,89 +29,96 @@ way.comp("reader", ({ props: { book } }) => {
 
   const next = async () => {
     const currentIndex = pIndex.value;
-    const currentAudio = audioCache.get(currentIndex);
-    
+    const current = audioCache.get(currentIndex);
+    const currentAudio = current instanceof Promise ? await current : current;
+
     // pause current if playing and remove ended listener
     if (currentAudio && isPlaying.value) {
       currentAudio.pause();
       currentAudio.removeEventListener("ended", next);
     }
-    
+
     stepNode(1);
     const newIndex = pIndex.value;
 
-    // Wait for the new current audio to finish loading if it's still loading
-    while (audioLoading.value.get(newIndex)) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    // Check if the new audio is ready, if not show loading indicator
+    const entry = audioCache.get(newIndex);
+    if (!entry || entry instanceof Promise) {
+      loadingAudio.value = true;
     }
 
-    const newAudio = audioCache.get(newIndex);
+    const newAudio = entry instanceof Promise ? await entry : entry;
+
     if (newAudio && isPlaying.value) {
       attachAudioEndedListener(newAudio);
       newAudio.play();
     }
-    
+
     // Trigger pre-generation for next paragraphs
     preGenerateNext(newIndex);
   };
 
-   const prev = async () => {
-     const currentIndex = pIndex.value;
-     const currentAudio = audioCache.get(currentIndex);
-     
-     // pause current if playing and remove ended listener
-     if (currentAudio && isPlaying.value) {
-       currentAudio.pause();
-       currentAudio.removeEventListener("ended", next);
-     }
-     
-     stepNode(-1);
-     const newIndex = pIndex.value;
+  const prev = async () => {
+    const currentIndex = pIndex.value;
+    const current = audioCache.get(currentIndex);
+    const currentAudio = current instanceof Promise ? await current : current;
 
-     // If the previous paragraph hasn't been generated, generate it now
-     if (!audioCache.has(newIndex)) {
-       loadingAudio.value = true;
-       await ensureAudioLoaded(newIndex);
-       loadingAudio.value = false;
-     }
+    // pause current if playing and remove ended listener
+    if (currentAudio && isPlaying.value) {
+      currentAudio.pause();
+      currentAudio.removeEventListener("ended", next);
+    }
 
-     const newAudio = audioCache.get(newIndex);
-     if (newAudio && isPlaying.value) {
-       attachAudioEndedListener(newAudio);
-       newAudio.play();
-     }
-     
-     // Trigger pre-generation for next paragraphs
-     preGenerateNext(newIndex);
-   };
+    stepNode(-1);
+    const newIndex = pIndex.value;
 
-   const nextSection = async () => {
-     const currentAudio = audioCache.get(pIndex.value);
-     
-     // pause current if playing
-     if (currentAudio && isPlaying.value) {
-       currentAudio.pause();
-       currentAudio.removeEventListener("ended", next);
-     }
-     
-     section.value = section.value + 1;
-     pIndex.value = 0;
-   };
+    // If the previous paragraph hasn't been generated, generate it now
+    if (!audioCache.has(newIndex)) {
+      loadingAudio.value = true;
+      await ensureAudioLoaded(newIndex);
+      loadingAudio.value = false;
+    }
 
-   const prevSection = async () => {
-     const currentAudio = audioCache.get(pIndex.value);
-     
-     // pause current if playing
-     if (currentAudio && isPlaying.value) {
-       currentAudio.pause();
-       currentAudio.removeEventListener("ended", next);
-     }
-     
-     if (section.value > 0) {
-       section.value = section.value - 1;
-       pIndex.value = 0;
-     }
-   };
+    const entry = audioCache.get(newIndex);
+    const newAudio = entry instanceof Promise ? await entry : entry;
+    if (newAudio && isPlaying.value) {
+      attachAudioEndedListener(newAudio);
+      newAudio.play();
+    }
+
+    // Trigger pre-generation for next paragraphs
+    preGenerateNext(newIndex);
+  };
+
+  const nextSection = async () => {
+    const entry = audioCache.get(pIndex.value);
+    const currentAudio = entry instanceof Promise ? await entry : entry;
+
+    // pause current if playing
+    if (currentAudio && isPlaying.value) {
+      currentAudio.pause();
+      currentAudio.removeEventListener("ended", next);
+    }
+
+    section.value = section.value + 1;
+    pIndex.value = 0;
+  };
+
+  const prevSection = async () => {
+    const entry = audioCache.get(pIndex.value);
+    const currentAudio = entry instanceof Promise ? await entry : entry;
+
+    // pause current if playing
+    if (currentAudio && isPlaying.value) {
+      currentAudio.pause();
+      currentAudio.removeEventListener("ended", next);
+    }
+
+    if (section.value > 0) {
+      section.value = section.value - 1;
+      pIndex.value = 0;
+    }
+  };
 
   function stepNode(x: number): void {
     const newIndex = pIndex.value + x;
@@ -133,9 +139,10 @@ way.comp("reader", ({ props: { book } }) => {
     }
   }
 
-  const playpause = () => {
-    const currentAudio = audioCache.get(pIndex.value);
-    
+  const playpause = async () => {
+    const entry = audioCache.get(pIndex.value);
+    const currentAudio = entry instanceof Promise ? await entry : entry;
+
     if (isPlaying.value) {
       // Pause: just pause the current audio
       if (currentAudio) {
@@ -173,41 +180,46 @@ way.comp("reader", ({ props: { book } }) => {
   }
 
   async function ensureAudioLoaded(index: number): Promise<void> {
-    // If already cached or currently loading, skip
-    if (audioCache.has(index) || audioLoading.value.get(index)) {
+    const existing = audioCache.get(index);
+
+    // If already loaded (HTMLAudioElement), skip
+    if (existing && !(existing instanceof Promise)) {
       return;
     }
 
-    // Mark as loading
-    const newLoadingMap = new Map(audioLoading.value);
-    newLoadingMap.set(index, true);
-    audioLoading.value = newLoadingMap;
+    // If already loading (Promise), wait for it
+    if (existing instanceof Promise) {
+      await existing;
+      return;
+    }
 
-    // Load the audio
-    const audio = await loadAudioForPTag(index);
-    
-    // Store in cache if successful
+    // Start loading and store the promise
+    const loadPromise = loadAudioForPTag(index);
+    audioCache.set(index, loadPromise);
+
+    // Wait for the audio to load
+    const audio = await loadPromise;
+
+    // Replace promise with the actual audio element
     if (audio) {
       audioCache.set(index, audio);
     }
-
-    // Mark as finished loading
-    const updatedLoadingMap = new Map(audioLoading.value);
-    updatedLoadingMap.delete(index);
-    audioLoading.value = updatedLoadingMap;
   }
 
   async function preGenerateNext(currentIndex: number): Promise<void> {
     // First ensure current is loaded
     await ensureAudioLoaded(currentIndex);
-    
-    // Then load next
+
+    // Once current is ready, enable play button
+    loadingAudio.value = false;
+
+    // Then load next (don't await - run in background)
     const next1 = currentIndex + 1;
-    await ensureAudioLoaded(next1);
-    
-    // Then load next+1
+    ensureAudioLoaded(next1);
+
+    // Then load next+1 (don't await - run in background)
     const next2 = currentIndex + 2;
-    await ensureAudioLoaded(next2);
+    ensureAudioLoaded(next2);
   }
 
   const onMounted = () => {
@@ -256,15 +268,12 @@ way.comp("reader", ({ props: { book } }) => {
   const render = async () => {
     loadingAudio.value = true;
     const curr = pIndex.value;
-    
+
     // Clear the cache when switching sections
     audioCache.clear();
-    audioLoading.value = new Map();
-    
+
     // Start pre-generation for current and next paragraphs
     await preGenerateNext(curr);
-    
-    loadingAudio.value = false;
   };
 
   way.effect(() => {
@@ -305,23 +314,23 @@ way.comp("reader", ({ props: { book } }) => {
     })();
   });
 
-   return {
-     section,
-     pIndex,
-     next,
-     prev,
-     nextSection,
-     prevSection,
-     onMounted,
-     isPlaying,
-     paused,
-     loadingAudio,
-     playpause,
-     selectedVoice,
-     voices,
-     speed,
-     speedOptions,
-     openMenu,
-     closeMenu,
-   };
+  return {
+    section,
+    pIndex,
+    next,
+    prev,
+    nextSection,
+    prevSection,
+    onMounted,
+    isPlaying,
+    paused,
+    loadingAudio,
+    playpause,
+    selectedVoice,
+    voices,
+    speed,
+    speedOptions,
+    openMenu,
+    closeMenu,
+  };
 });

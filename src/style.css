@@ -26,5 +26,11 @@ header {
 }
 
 .button {
-  @apply bg-gray-200 rounded-sm px-2 hover:shadow cursor-pointer;
+  @apply bg-gray-200 rounded-sm px-2 hover:shadow;
+  &:not(:disabled) {
+    @apply cursor-pointer;
+  }
+  &:disabled {
+    @apply opacity-50;
+  }
 }
