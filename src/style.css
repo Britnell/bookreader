@@ -5,6 +5,7 @@
 #epub {
   height: calc(100vh - 8rem);
   overflow: auto;
+  font-size: 1.2rem;
 
   p {
     line-height: 1.5;
@@ -17,6 +18,7 @@
 
 main,
 header {
+  font-size: 1.2rem;
   max-width: 60ch;
   margin: 0 auto;
 }
