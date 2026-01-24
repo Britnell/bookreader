@@ -56,35 +56,63 @@ way.comp("reader", ({ props: { book } }) => {
     preGenerateNext(newIndex);
   };
 
-  const prev = async () => {
-    const currentIndex = pIndex.value;
-    const currentAudio = audioCache.get(currentIndex);
-    
-    // pause current if playing and remove ended listener
-    if (currentAudio && isPlaying.value) {
-      currentAudio.pause();
-      currentAudio.removeEventListener("ended", next);
-    }
-    
-    stepNode(-1);
-    const newIndex = pIndex.value;
+   const prev = async () => {
+     const currentIndex = pIndex.value;
+     const currentAudio = audioCache.get(currentIndex);
+     
+     // pause current if playing and remove ended listener
+     if (currentAudio && isPlaying.value) {
+       currentAudio.pause();
+       currentAudio.removeEventListener("ended", next);
+     }
+     
+     stepNode(-1);
+     const newIndex = pIndex.value;
 
-    // If the previous paragraph hasn't been generated, generate it now
-    if (!audioCache.has(newIndex)) {
-      loadingAudio.value = true;
-      await ensureAudioLoaded(newIndex);
-      loadingAudio.value = false;
-    }
+     // If the previous paragraph hasn't been generated, generate it now
+     if (!audioCache.has(newIndex)) {
+       loadingAudio.value = true;
+       await ensureAudioLoaded(newIndex);
+       loadingAudio.value = false;
+     }
 
-    const newAudio = audioCache.get(newIndex);
-    if (newAudio && isPlaying.value) {
-      attachAudioEndedListener(newAudio);
-      newAudio.play();
-    }
-    
-    // Trigger pre-generation for next paragraphs
-    preGenerateNext(newIndex);
-  };
+     const newAudio = audioCache.get(newIndex);
+     if (newAudio && isPlaying.value) {
+       attachAudioEndedListener(newAudio);
+       newAudio.play();
+     }
+     
+     // Trigger pre-generation for next paragraphs
+     preGenerateNext(newIndex);
+   };
+
+   const nextSection = async () => {
+     const currentAudio = audioCache.get(pIndex.value);
+     
+     // pause current if playing
+     if (currentAudio && isPlaying.value) {
+       currentAudio.pause();
+       currentAudio.removeEventListener("ended", next);
+     }
+     
+     section.value = section.value + 1;
+     pIndex.value = 0;
+   };
+
+   const prevSection = async () => {
+     const currentAudio = audioCache.get(pIndex.value);
+     
+     // pause current if playing
+     if (currentAudio && isPlaying.value) {
+       currentAudio.pause();
+       currentAudio.removeEventListener("ended", next);
+     }
+     
+     if (section.value > 0) {
+       section.value = section.value - 1;
+       pIndex.value = 0;
+     }
+   };
 
   function stepNode(x: number): void {
     const newIndex = pIndex.value + x;
@@ -277,21 +305,23 @@ way.comp("reader", ({ props: { book } }) => {
     })();
   });
 
-  return {
-    section,
-    pIndex,
-    next,
-    prev,
-    onMounted,
-    isPlaying,
-    paused,
-    loadingAudio,
-    playpause,
-    selectedVoice,
-    voices,
-    speed,
-    speedOptions,
-    openMenu,
-    closeMenu,
-  };
+   return {
+     section,
+     pIndex,
+     next,
+     prev,
+     nextSection,
+     prevSection,
+     onMounted,
+     isPlaying,
+     paused,
+     loadingAudio,
+     playpause,
+     selectedVoice,
+     voices,
+     speed,
+     speedOptions,
+     openMenu,
+     closeMenu,
+   };
 });

@@ -11,10 +11,10 @@
   </head>
   <body x-comp="epub">
     <div x-comp="reader" x-props="{book}">
-      <header class="">
-        bookreader
-        <button @click="changeBook()">Change Book</button>
-        <button @click="openMenu()">Menu</button>
+      <header class="flex items-center gap-2">
+        <span class="text-2xl font-semibold mr-auto"> bookreader </span>
+        <button class="button" @click="changeBook()">Change Book</button>
+        <button class="button" @click="openMenu()">Menu</button>
       </header>
 
       <dialog
@@ -42,8 +42,7 @@
       </dialog>
 
       <main x-comp="epub">
-        <h1>bookreader</h1>
-        <section x-show="!book.value">
+        <div x-show="!book.value">
           <input
             name="src"
             id="src"
@@ -51,17 +50,33 @@
             accept=".epub"
             @change="fileSelect($event)"
           />
-        </section>
-        <article x-else>
-          <h2 x-text="title.value || 'epub'"></h2>
-          <button
-            @click="playpause()"
-            x-text="isPlaying.value ? 'Pause' : 'play'"
-            :disabled="loadingAudio.value"
-          ></button>
-          <button @click="prev()">Previous</button>
-          <span> {pIndex.value} </span>
-          <button @click="next()">Next</button>
+        </div>
+
+        <article x-else class="relative">
+          <h2 class="text-center text-xl font-semibold">
+            {title.value || 'epub'}
+          </h2>
+
+          <div class="flex gap-3">
+            <span class="x ml-auto"> Section {section} </span>
+            <button class="button" @click="nextSection()">next</button>
+            <button class="button" @click="prevSection()">prev</button>
+          </div>
+          <div
+            class="flex justify-center gap-4 fixed w-full bottom-0 left-0 right-0"
+          >
+            <span>pos {pIndex.value} </span>
+            <button class="button" @click="prev()">Previous</button>
+            <button
+              @click="playpause()"
+              :disabled="loadingAudio.value"
+              class="button"
+            >
+              {isPlaying.value ? 'Pause' : 'play'}
+            </button>
+            <button class="button" @click="next()">skip &rarr;</button>
+          </div>
+
           <audio id="player"></audio>
           <div id="epub"></div>
         </article>

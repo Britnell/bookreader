@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
@@ -5,10 +7,10 @@
 #epub {
   height: calc(100vh - 8rem);
   overflow: auto;
-  font-size: 1.2rem;
 
   p {
     line-height: 1.5;
+    margin: 1.2rem 0;
   }
 }
 
@@ -18,7 +20,11 @@
 
 main,
 header {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   max-width: 60ch;
   margin: 0 auto;
+}
+
+.button {
+  @apply bg-gray-200 rounded-sm px-2 hover:shadow cursor-pointer;
 }

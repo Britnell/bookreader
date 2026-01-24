@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },
   "dependencies": {
     "@gradio/client": "^2.0.3",
+    "@tailwindcss/vite": "^4.1.18",
     "epubjs": "^0.3.93",
     "wayy": "^0.1.5"
   }
