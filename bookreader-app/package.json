@@ -17,6 +17,7 @@
     "@gradio/client": "^2.0.3",
     "@tailwindcss/vite": "^4.1.18",
     "epubjs": "^0.3.93",
+    "onnxruntime-node": "^1.23.2",
     "wayy": "^0.1.5"
   }
 }
