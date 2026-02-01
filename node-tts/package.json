@@ -10,6 +10,8 @@
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"dependencies": {
-		"kokoro-js": "^1.2.1"
+		"epub2": "^3.0.2",
+		"kokoro-js": "^1.2.1",
+		"node-html-parser": "^7.0.2"
 	}
 }
