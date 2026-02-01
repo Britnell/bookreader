@@ -7,3 +7,8 @@ follow isntall instrucitons
 
 and/or kokoro-js 
 https://www.npmjs.com/package/kokoro-js
+
+piper is a pain
+https://n4ze3m.com/blog/running-piper-tts-with-javascript-in-the-bun-runtime
+need phonemizer, and download each voice
+later
