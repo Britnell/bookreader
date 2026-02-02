@@ -89,7 +89,7 @@ function chunkTextForTTS(text: string): string[] {
 		chunks.push(currentChunk.trim());
 	}
 
-	return chunks;
+	return chunks.join("\n\n");
 }
 
 function parseArgs() {
@@ -128,17 +128,8 @@ async function main() {
 		}
 
 		const text = parseChapterText(html);
-		const chunks = chunkTextForTTS(text);
+		const result = chunkTextForTTS(text);
 
-		console.log(`Chapter split into ${chunks.length} chunks for TTS`);
-		console.log("---");
-
-		chunks.forEach((chunk, index) => {
-			const tokens = estimateTokens(chunk);
-			console.log(
-				`\n=== Chunk ${index + 1}/${chunks.length} (~${tokens} tokens) ===`,
-			);
-			console.log(chunk);
-		});
+		console.log(result);
 	});
 }
