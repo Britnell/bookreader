@@ -93,9 +93,9 @@ way.comp("reader", ({ props: { book } }) => {
 		preGenerateNext(newIndex)
 	}
 
-	const nextSection = async () => {
+	const nextSection = () => {
 		const entry = audioCache.get(pIndex.value)
-		const currentAudio = entry instanceof Promise ? await entry : entry
+		const currentAudio = entry instanceof Promise ? null : entry
 
 		// pause current if playing
 		if (currentAudio && isPlaying.value) {
@@ -107,9 +107,9 @@ way.comp("reader", ({ props: { book } }) => {
 		pIndex.value = 0
 	}
 
-	const prevSection = async () => {
+	const prevSection = () => {
 		const entry = audioCache.get(pIndex.value)
-		const currentAudio = entry instanceof Promise ? await entry : entry
+		const currentAudio = entry instanceof Promise ? null : entry
 
 		// pause current if playing
 		if (currentAudio && isPlaying.value) {
@@ -299,7 +299,6 @@ way.comp("reader", ({ props: { book } }) => {
 
 	way.effect(() => {
 		if (!book?.value || !epubEl) return
-
 		;(async () => {
 			const s = book.value.spine.get(section.value)
 			const doc = await s?.load(book.value.load.bind(book.value))
