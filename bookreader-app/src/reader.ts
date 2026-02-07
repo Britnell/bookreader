@@ -103,6 +103,8 @@ way.comp("reader", ({ props: { book } }) => {
 			currentAudio.removeEventListener("ended", next)
 		}
 
+		// Clear cache before switching sections
+		audioCache.clear()
 		section.value = section.value + 1
 		pIndex.value = 0
 	}
@@ -118,6 +120,8 @@ way.comp("reader", ({ props: { book } }) => {
 		}
 
 		if (section.value > 0) {
+			// Clear cache before switching sections
+			audioCache.clear()
 			section.value = section.value - 1
 			pIndex.value = 0
 		}
@@ -130,11 +134,15 @@ way.comp("reader", ({ props: { book } }) => {
 		if (newIndex < 0) {
 			// Move to previous section
 			if (section.value > 0) {
+				// Clear cache before switching sections
+				audioCache.clear()
 				section.value = section.value - 1
 				pIndex.value = 0
 			}
 		} else if (newIndex >= pTagCount) {
 			// Move to next section
+			// Clear cache before switching sections
+			audioCache.clear()
 			section.value = section.value + 1
 			pIndex.value = 0
 		} else {
