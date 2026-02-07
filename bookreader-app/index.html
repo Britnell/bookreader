@@ -1,91 +1,91 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>bookreader</title>
-    <!-- <link rel="stylesheet" href="/pages/style.css" /> -->
-    <script src="/src/way-inline.js"></script>
-    <script type="module" src="/src/main.ts"></script>
-  </head>
-  <body x-comp="epub">
-    <div x-comp="reader" x-props="{book}">
-      <header class="flex items-center gap-2">
-        <span class="text-2xl font-semibold mr-auto"> bookreader </span>
-        <button class="button" @click="changeBook()">Change Book</button>
-        <button class="button" @click="openMenu()">Menu</button>
-      </header>
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="/vite.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>bookreader</title>
+		<!-- <link rel="stylesheet" href="/pages/style.css" /> -->
+		<script src="/src/way-inline.js"></script>
+		<script type="module" src="/src/main.ts"></script>
+	</head>
+	<body x-comp="epub">
+		<div x-comp="reader" x-props="{book}">
+			<header class="flex items-center gap-2">
+				<span class="text-2xl font-semibold mr-auto"> bookreader </span>
+				<button class="button" @click="changeBook()">Change Book</button>
+				<button class="button" @click="openMenu()">Menu</button>
+			</header>
 
-      <dialog
-        id="menu-dialog"
-        @click="(e) => e.target === e.currentTarget && closeMenu()"
-      >
-        <h3>Settings</h3>
-        <label>
-          Voice:
-          <select x-model="selectedVoice">
-            <template x-for="voice in voices.value">
-              <option x-text="voice" :value="voice"></option>
-            </template>
-          </select>
-        </label>
-        <label>
-          Speed:
-          <select x-model="speed">
-            <template x-for="speedOption in speedOptions">
-              <option x-text="speedOption + 'x'" :value="speedOption"></option>
-            </template>
-          </select>
-        </label>
-        <button @click="closeMenu()">Close</button>
-      </dialog>
+			<dialog
+				id="menu-dialog"
+				@click="(e) => e.target === e.currentTarget && closeMenu()"
+			>
+				<h3>Settings</h3>
+				<label>
+					Voice:
+					<select x-model="selectedVoice">
+						<template x-for="voice in voices.value">
+							<option x-text="voice" :value="voice"></option>
+						</template>
+					</select>
+				</label>
+				<label>
+					Speed:
+					<select x-model="speed">
+						<template x-for="speedOption in speedOptions">
+							<option x-text="speedOption + 'x'" :value="speedOption"></option>
+						</template>
+					</select>
+				</label>
+				<button @click="closeMenu()">Close</button>
+			</dialog>
 
-      <main x-comp="epub">
-        <div x-show="!book.value">
-          <input
-            name="src"
-            id="src"
-            type="file"
-            accept=".epub"
-            @change="fileSelect($event)"
-          />
-        </div>
+			<main x-comp="epub">
+				<div x-show="!book.value">
+					<input
+						name="src"
+						id="src"
+						type="file"
+						accept=".epub"
+						@change="fileSelect($event)"
+					/>
+				</div>
 
-        <article x-else class="relative">
-          <div class="flex gap-3">
-            <h2 class="text-center text-xl font-semibold">
-              {title.value || 'epub'}
-            </h2>
-            <span class="x ml-auto"> Section {section} </span>
-            <button class="button" @click="prevSection()">prev</button>
-            <button class="button" @click="nextSection()">next</button>
-          </div>
-          <div
-            class="flex justify-center gap-4 fixed w-full bottom-0 left-0 right-0"
-          >
-            <span>pos {pIndex.value} </span>
-            <button class="button" @click="prev()">Previous</button>
-            <button
-              @click="playpause()"
-              :disabled="loadingAudio.value"
-              class="button"
-            >
-              {isPlaying.value ? 'Pause' : 'play'}
-            </button>
-            <button class="button" @click="next()">skip &rarr;</button>
-          </div>
-          <div class="flex justify-center absolute w-full">
-            <span
-              x-show="loadingAudio.value"
-              class="bg-gray-100 py-1 px-3 rounded-lg"
-              >LOADING...</span
-            >
-          </div>
-          <audio id="player"></audio>
-          <div id="epub"></div>
-        </article>
-      </main>
-    </div>
-  </body>
+				<article x-else class="relative">
+					<div class="flex gap-3">
+						<h2 class="text-center text-xl font-semibold">
+							{title.value || 'epub'}
+						</h2>
+						<span class="x ml-auto"> Section {section} </span>
+						<button class="button" @click="prevSection()">prev</button>
+						<button class="button" @click="nextSection()">next</button>
+					</div>
+					<div
+						class="flex justify-center gap-4 fixed w-full bottom-0 left-0 right-0"
+					>
+						<span>pos {pIndex.value} </span>
+						<button class="button" @click="prev()">Previous</button>
+						<button
+							@click="playpause()"
+							:disabled="loadingAudio.value"
+							class="button"
+						>
+							{isPlaying.value ? 'Pause' : 'play'}
+						</button>
+						<button class="button" @click="next()">skip &rarr;</button>
+					</div>
+					<div class="flex justify-center absolute w-full">
+						<span
+							x-show="loadingAudio.value"
+							class="bg-gray-100 py-1 px-3 rounded-lg"
+							>LOADING...</span
+						>
+					</div>
+					<audio id="player"></audio>
+					<div id="epub"></div>
+				</article>
+			</main>
+		</div>
+	</body>
 </html>
