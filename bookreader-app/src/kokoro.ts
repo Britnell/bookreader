@@ -14,6 +14,7 @@ export async function generateSpeech(
 			voice: voice,
 			response_format: "mp3",
 			speed: speed,
+			stream: true,
 		}),
 	})
 

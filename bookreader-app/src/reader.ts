@@ -229,8 +229,8 @@ way.comp("reader", ({ props: { book } }) => {
 		ensureAudioLoaded(next1)
 
 		// Then load next+1 (don't await - run in background)
-		const next2 = currentIndex + 2
-		ensureAudioLoaded(next2)
+		// const next2 = currentIndex + 2
+		// ensureAudioLoaded(next2)
 	}
 
 	const onMounted = () => {
