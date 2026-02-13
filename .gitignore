@@ -1,3 +1,5 @@
+node-tts/*/
+
 # Logs
 logs
 *.log

@@ -123,26 +123,25 @@ function parseArgs() {
 const args = parseArgs()
 if (!args["-f"] || !args["-ch"]) {
 	console.error(`Missing required arguments
-	  -f <file> -ch <chapter>
+	  -f <file> -ch <chapter> [-v <voice>] [-sp <speed>]
 	`)
 	process.exit(1)
 }
 
 const file = args["-f"]
 const ch = parseInt(args["-ch"], 10)
+const voice = args["-v"] || "bm_lewis"
+const speed = args["-sp"] ? parseFloat(args["-sp"]) : 1
 
 main()
 
 async function main() {
 	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
-
-	epub.flow.forEach(function (chapter) {
-		console.log(chapter.id)
-	})
-
 	const id = epub.flow[ch].id
-
-	// Promisify the getChapter callback
+	// epub.flow.forEach(function (chapter) {
+	// 	console.log(chapter.id)
+	// })
+	// * Promisify the getChapter callback
 	const html = await new Promise<string>((resolve, reject) => {
 		epub.getChapter(id, function (error, html) {
 			if (error) {
@@ -154,9 +153,11 @@ async function main() {
 	})
 
 	const text = parseChapterText(html)
-	console.log(`Generating audio for chapter ${ch}...`)
+	console.log(
+		`Generating audio for chapter ${ch} (voice: ${voice}, speed: ${speed})...`,
+	)
 
-	const resp = await kokoroapi({ text, voice: "bf_emma", speed: 0.7 })
+	const resp = await kokoroapi({ text, voice, speed })
 
 	if (!resp.ok) {
 		throw new Error(`API request failed: ${resp.status} ${resp.statusText}`)
