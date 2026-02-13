@@ -33,7 +33,7 @@ way.comp("reader", ({ props: { book } }) => {
 	const next = async () => {
 		const currentIndex = pIndex.value
 		const current = audioCache.get(currentIndex)
-		const currentAudio = current instanceof Promise ? await current : current
+		const currentAudio = current instanceof Promise ? null : current
 
 		// pause current if playing and remove ended listener
 		if (currentAudio && isPlaying.value) {
@@ -78,15 +78,33 @@ way.comp("reader", ({ props: { book } }) => {
 		// If the previous paragraph hasn't been generated, generate it now
 		if (!audioCache.has(newIndex)) {
 			loadingAudio.value = true
-			await ensureAudioLoaded(newIndex)
-			loadingAudio.value = false
-		}
-
-		const entry = audioCache.get(newIndex)
-		const newAudio = entry instanceof Promise ? await entry : entry
-		if (newAudio && isPlaying.value) {
-			attachAudioEndedListener(newAudio)
-			newAudio.play()
+			ensureAudioLoaded(newIndex).then(() => {
+				loadingAudio.value = false
+				const entry = audioCache.get(newIndex)
+				const newAudio = entry instanceof Promise ? null : entry
+				if (newAudio && isPlaying.value && pIndex.value === newIndex) {
+					attachAudioEndedListener(newAudio)
+					newAudio.play()
+				}
+			})
+		} else {
+			const entry = audioCache.get(newIndex)
+			if (entry instanceof Promise) {
+				loadingAudio.value = true
+				entry.then((newAudio) => {
+					loadingAudio.value = false
+					if (newAudio && isPlaying.value && pIndex.value === newIndex) {
+						attachAudioEndedListener(newAudio)
+						newAudio.play()
+					}
+				})
+			} else {
+				loadingAudio.value = false
+				if (entry && isPlaying.value) {
+					attachAudioEndedListener(entry)
+					entry.play()
+				}
+			}
 		}
 
 		// Trigger pre-generation for next paragraphs
@@ -229,8 +247,8 @@ way.comp("reader", ({ props: { book } }) => {
 		ensureAudioLoaded(next1)
 
 		// Then load next+1 (don't await - run in background)
-		// const next2 = currentIndex + 2
-		// ensureAudioLoaded(next2)
+		const next2 = currentIndex + 2
+		ensureAudioLoaded(next2)
 	}
 
 	const onMounted = () => {
