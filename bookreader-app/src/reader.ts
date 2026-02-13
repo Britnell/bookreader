@@ -52,9 +52,13 @@ way.comp("reader", ({ props: { book } }) => {
 
 		const newAudio = entry instanceof Promise ? await entry : entry
 
-		if (newAudio && isPlaying.value) {
-			attachAudioEndedListener(newAudio)
-			newAudio.play()
+		if (newAudio) {
+			// Reset audio position to the beginning
+			newAudio.currentTime = 0
+			if (isPlaying.value) {
+				attachAudioEndedListener(newAudio)
+				newAudio.play()
+			}
 		}
 
 		// Trigger pre-generation for next paragraphs
@@ -66,31 +70,48 @@ way.comp("reader", ({ props: { book } }) => {
 		const current = audioCache.get(currentIndex)
 		const currentAudio = current instanceof Promise ? null : current
 
+		// Check if we should restart the current paragraph or go to previous
+		const shouldGoToPrevious = !currentAudio || currentAudio.currentTime < 1
+
 		// pause current if playing and remove ended listener
 		if (currentAudio && isPlaying.value) {
 			currentAudio.pause()
 			currentAudio.removeEventListener("ended", next)
 		}
 
-		stepNode(-1)
-		const newIndex = pIndex.value
+		if (shouldGoToPrevious) {
+			// Go to previous paragraph
+			stepNode(-1)
+			const newIndex = pIndex.value
 
-		// If the previous paragraph hasn't been generated, generate it now
-		if (!audioCache.has(newIndex)) {
-			loadingAudio.value = true
-			await ensureAudioLoaded(newIndex)
-			loadingAudio.value = false
+			// If the previous paragraph hasn't been generated, generate it now
+			if (!audioCache.has(newIndex)) {
+				loadingAudio.value = true
+				await ensureAudioLoaded(newIndex)
+				loadingAudio.value = false
+			}
+
+			const entry = audioCache.get(newIndex)
+			const newAudio = entry instanceof Promise ? await entry : entry
+			if (newAudio) {
+				// Reset audio position to the beginning
+				newAudio.currentTime = 0
+				if (isPlaying.value) {
+					attachAudioEndedListener(newAudio)
+					newAudio.play()
+				}
+			}
+
+			// Trigger pre-generation for next paragraphs
+			preGenerateNext(newIndex)
+		} else {
+			// Restart the current paragraph
+			currentAudio.currentTime = 0
+			if (isPlaying.value) {
+				attachAudioEndedListener(currentAudio)
+				currentAudio.play()
+			}
 		}
-
-		const entry = audioCache.get(newIndex)
-		const newAudio = entry instanceof Promise ? await entry : entry
-		if (newAudio && isPlaying.value) {
-			attachAudioEndedListener(newAudio)
-			newAudio.play()
-		}
-
-		// Trigger pre-generation for next paragraphs
-		preGenerateNext(newIndex)
 	}
 
 	const nextSection = () => {
