@@ -2,9 +2,8 @@
 import { EPub } from "epub2"
 import { parse } from "node-html-parser"
 import { writeFile, mkdir } from "fs/promises"
-import { createWriteStream } from "fs"
-import { pipeline } from "stream/promises"
 import { join } from "path"
+import { generateSpeech, type Voice } from "./kokoro.ts"
 
 const TARGET_MIN_TOKENS = 175
 const TARGET_MAX_TOKENS = 250
@@ -28,22 +27,6 @@ function splitIntoSentences(text: string): string[] {
 	const sentences = text.match(sentenceRegex) || []
 	return sentences.filter((s) => s.length > 0)
 }
-
-const kokoroapi = ({ text, voice, speed }) =>
-	fetch("http://localhost:8880/v1/audio/speech", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({
-			model: "kokoro",
-			input: text,
-			voice: voice,
-			response_format: "mp3",
-			speed: speed,
-			stream: true,
-		}),
-	})
 
 // Chunk text into TTS-friendly segments based on Kokoro recommendations
 function chunkTextForTTS(text: string): string[] {
@@ -130,7 +113,7 @@ if (!args["-f"] || !args["-ch"] || !args["-v"]) {
 
 const file = args["-f"]
 const ch = parseInt(args["-ch"], 10)
-const voice = args["-v"]
+const voice = args["-v"] as Voice
 const speed = args["-sp"] ? parseFloat(args["-sp"]) : 1
 
 main()
@@ -157,11 +140,8 @@ async function main() {
 		`Generating audio for chapter ${ch} (voice: ${voice}, speed: ${speed})...`,
 	)
 
-	const resp = await kokoroapi({ text, voice, speed })
-
-	if (!resp.ok) {
-		throw new Error(`API request failed: ${resp.status} ${resp.statusText}`)
-	}
+	// Generate speech using local Kokoro
+	const audio = await generateSpeech({ text, voice, speed })
 
 	// Create folder using book title
 	const bookTitle = epub.metadata.title || "unknown_book"
@@ -175,15 +155,9 @@ async function main() {
 	await writeFile(textFile, text, "utf-8")
 	console.log(`Text saved to ${textFile}`)
 
-	// Save the audio stream to an MP3 file
+	// Save the audio to an MP3 file
 	const outputFile = join(outputDir, `chapter_${ch}.mp3`)
-	const fileStream = createWriteStream(outputFile)
-
-	if (!resp.body) {
-		throw new Error("Response body is null")
-	}
-
-	await pipeline(resp.body, fileStream)
+	await audio.save(outputFile)
 
 	console.log(`Audio saved to ${outputFile}`)
 }
