@@ -108,6 +108,19 @@ export function chunkify(text: string): string[] {
 		}
 
 		if (tokens <= MAX_TOKENS) {
+			// Lookahead: peek at next sentence — absorb it if it's short
+			// and the combined result stays within UPPER_TOKENS
+			if (pos < text.length) {
+				const { end: nextEnd } = findSentenceEnd(text, pos)
+				const nextSentence = text.slice(pos, nextEnd).trim()
+				if (nextSentence.length > 0) {
+					const withNext = candidate + " " + nextSentence
+					if (estimateTokens(withNext) <= UPPER_TOKENS) {
+						buffer = candidate
+						continue
+					}
+				}
+			}
 			chunks.push(candidate.trim())
 			buffer = ""
 			continue
