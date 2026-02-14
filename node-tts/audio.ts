@@ -30,8 +30,8 @@ export async function joinAudioChunks(
 		],
 		{
 			cwd: process.cwd(),
-			stdout: "inherit",
-			stderr: "inherit",
+			stdout: "ignore",
+			stderr: "ignore",
 		},
 	)
 
