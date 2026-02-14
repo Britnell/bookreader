@@ -111,7 +111,7 @@ async function readChapter(epub, chapter) {
 
 		const text = chunks[i]
 		console.log(`Generating chunk ${i + 1} , ${text.length}`)
-		console.log({ i, text, l: text.length / 4 })
+		console.log({ i, len: text.length / 4 })
 		const audio = await generateSpeech({ text, voice, speed })
 		await audio.save(chunkPath)
 	}

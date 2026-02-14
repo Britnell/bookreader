@@ -1,7 +1,7 @@
 const MIN_TOKENS = 100 // never below
 const OPTIMAL_TOKENS = 200 // optimal below
 const UPPER_TOKENS = 300 // ok below
-const MAX_TOKENS = 490 // never above
+const MAX_TOKENS = 400 // never above
 
 /** Estimate tokens (roughly 1 token per 4 characters for English) */
 export function estimateTokens(text: string): number {
@@ -118,15 +118,15 @@ export function chunkify(text: string): string[] {
 					estimateTokens(nextSentence) < MIN_TOKENS
 				) {
 					const withNext = candidate + " " + nextSentence
-					// Absorb short next sentence if combined stays in UPPER range
-					if (estimateTokens(withNext) <= UPPER_TOKENS) {
+					// Absorb short next sentence if combined stays in OPTIMAL range
+					if (estimateTokens(withNext) <= OPTIMAL_TOKENS) {
 						buffer = candidate
 						continue
 					}
 					// Last sentence exception: absorb a short trailing sentence
-					// even above UPPER, as long as we stay under MAX
+					// even above OPTIMAL, as long as we stay under UPPER
 					const isLastSentence = text.slice(nextEnd).trim().length === 0
-					if (isLastSentence && estimateTokens(withNext) <= MAX_TOKENS) {
+					if (isLastSentence && estimateTokens(withNext) <= UPPER_TOKENS) {
 						buffer = candidate
 						continue
 					}
