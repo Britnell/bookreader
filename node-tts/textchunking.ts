@@ -68,10 +68,10 @@ export function splitAtMinorBreak(
 	return fallback > start ? fallback : Math.min(limit, text.length)
 }
 
-/** Drain text that may exceed MAX_TOKENS by splitting at minor punctuation. */
+/** Drain text that exceeds OPTIMAL_TOKENS by splitting at minor punctuation. */
 export function drainOversized(text: string, chunks: string[]): string {
 	let remaining = text
-	while (estimateTokens(remaining) > MAX_TOKENS) {
+	while (estimateTokens(remaining) > OPTIMAL_TOKENS) {
 		const breaks: number[] = []
 		for (let i = 0; i < remaining.length; i++) {
 			const ch = remaining[i]
@@ -79,7 +79,7 @@ export function drainOversized(text: string, chunks: string[]): string {
 				breaks.push(i + 1)
 			}
 		}
-		const splitPoint = splitAtMinorBreak(remaining, 0, breaks, MAX_TOKENS)
+		const splitPoint = splitAtMinorBreak(remaining, 0, breaks, OPTIMAL_TOKENS)
 		chunks.push(remaining.slice(0, splitPoint).trim())
 		remaining = remaining.slice(splitPoint).trim()
 	}
@@ -107,9 +107,9 @@ export function chunkify(text: string): string[] {
 			continue
 		}
 
-		if (tokens <= MAX_TOKENS) {
-			// Lookahead: peek at next sentence — absorb it if it's short
-			// and the combined result stays within UPPER_TOKENS
+		if (tokens <= OPTIMAL_TOKENS) {
+			// Lookahead: peek at next sentence — if it's short, defer so we
+			// can absorb it on the next iteration
 			if (pos < text.length) {
 				const { end: nextEnd } = findSentenceEnd(text, pos)
 				const nextSentence = text.slice(pos, nextEnd).trim()
@@ -118,20 +118,27 @@ export function chunkify(text: string): string[] {
 					estimateTokens(nextSentence) < MIN_TOKENS
 				) {
 					const withNext = candidate + " " + nextSentence
-					const isLastSentence = text.slice(nextEnd).trim().length === 0
-					// Absorb a short next sentence if combined stays in optimal range
-					if (estimateTokens(withNext) <= OPTIMAL_TOKENS) {
+					// Absorb short next sentence if combined stays in UPPER range
+					if (estimateTokens(withNext) <= UPPER_TOKENS) {
 						buffer = candidate
 						continue
 					}
 					// Last sentence exception: absorb a short trailing sentence
-					// even above optimal, as long as we stay under MAX
+					// even above UPPER, as long as we stay under MAX
+					const isLastSentence = text.slice(nextEnd).trim().length === 0
 					if (isLastSentence && estimateTokens(withNext) <= MAX_TOKENS) {
 						buffer = candidate
 						continue
 					}
 				}
 			}
+			chunks.push(candidate.trim())
+			buffer = ""
+			continue
+		}
+
+		if (tokens <= UPPER_TOKENS) {
+			// Between OPTIMAL and UPPER — emit as-is, no further absorption
 			chunks.push(candidate.trim())
 			buffer = ""
 			continue
