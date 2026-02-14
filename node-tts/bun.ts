@@ -36,39 +36,43 @@ async function main() {
 		const chapterTitle = chapter.id.split(".")[0]
 
 		// Check if chapter already exists
-		if (await chapterExists(epub, chapter)) {
+		if (await chapterExists(epub, chapter, i)) {
 			continue
 		}
 
 		console.log(`chapter ${i + 1}/${epub.flow.length} : ${chapterTitle}`)
-		await readChapter(epub, chapter)
+		await readChapter(epub, chapter, i)
 	}
 	console.log("done")
 }
 
-function getBookAndChapterTitles(epub, chapter) {
+function getBookAndChapterTitles(epub, chapter, index: number) {
 	const bookTitle = epub.metadata.title || "untitled"
 	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
 	const chapterTitle = chapter.id.split(".")[0]
+	const paddedIndex = String(index).padStart(2, "0")
+	const chapterFileName = `${paddedIndex}_${chapterTitle}`
 
-	return { sanitizedTitle, chapterTitle }
+	return { sanitizedTitle, chapterFileName }
 }
 
-async function chapterExists(epub, chapter): Promise<boolean> {
-	const { sanitizedTitle, chapterTitle } = getBookAndChapterTitles(
+async function chapterExists(epub, chapter, index: number): Promise<boolean> {
+	const { sanitizedTitle, chapterFileName } = getBookAndChapterTitles(
 		epub,
 		chapter,
+		index,
 	)
 	const outputDir = `./${sanitizedTitle}`
-	const audioFile = `${outputDir}/${chapterTitle}.wav`
+	const audioFile = `${outputDir}/${chapterFileName}.wav`
 
 	return await Bun.file(audioFile).exists()
 }
 
-async function readChapter(epub, chapter) {
-	const { sanitizedTitle, chapterTitle } = getBookAndChapterTitles(
+async function readChapter(epub, chapter, index: number) {
+	const { sanitizedTitle, chapterFileName } = getBookAndChapterTitles(
 		epub,
 		chapter,
+		index,
 	)
 
 	// get text
@@ -77,7 +81,7 @@ async function readChapter(epub, chapter) {
 
 	// Skip empty chapters
 	if (!text.trim()) {
-		console.log(`Skipping empty chapter: ${chapterTitle}`)
+		console.log(`Skipping empty chapter: ${chapterFileName}`)
 		return
 	}
 
@@ -87,7 +91,7 @@ async function readChapter(epub, chapter) {
 	// Ensure directory exists
 	await Bun.file(outputDir).ensureDir?.()
 
-	const textFile = `${outputDir}/${chapterTitle}.txt`
+	const textFile = `${outputDir}/${chapterFileName}.txt`
 	await Bun.write(textFile, text)
 
 	// make audio chunks
@@ -95,13 +99,13 @@ async function readChapter(epub, chapter) {
 
 	// Skip if no chunks (shouldn't happen after empty text check, but just in case)
 	if (chunks.length === 0) {
-		console.log(`No chunks generated for chapter: ${chapterTitle}`)
+		console.log(`No chunks generated for chapter: ${chapterFileName}`)
 		return
 	}
 
 	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
-		const chunkPath = `${outputDir}/${chapterTitle}_${i}.wav`
+		const chunkPath = `${outputDir}/${chapterFileName}_${i}.wav`
 
 		// Check if chunk already exists
 		if (await Bun.file(chunkPath).exists()) {
@@ -118,7 +122,7 @@ async function readChapter(epub, chapter) {
 
 	// Join chunks with ffmpeg
 	console.log("join chapter chunks + cleanup")
-	await joinAudioChunks(outputDir, chapterTitle, chunks.length)
+	await joinAudioChunks(outputDir, chapterFileName, chunks.length)
 }
 
 function getChapter(epub, id) {
