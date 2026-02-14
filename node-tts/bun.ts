@@ -1,8 +1,6 @@
 // import * as EPub from "epub2/node";
 import { EPub } from "epub2"
 import { parse } from "node-html-parser"
-import { join } from "path"
-import { mkdir } from "fs/promises"
 import { parseArgs } from "util"
 import { generateSpeech, type Voice } from "./kokoro.ts"
 
@@ -11,9 +9,6 @@ const TARGET_MAX_TOKENS = 250
 const ABSOLUTE_MAX_TOKENS = 450
 
 // Simple token estimator (roughly 1 token per 4 characters for English)
-function estimateTokens(text: string): number {
-	return Math.ceil(text.length / 4)
-}
 
 const { values } = parseArgs({
 	args: Bun.argv,
@@ -34,11 +29,48 @@ const speed = parseFloat(values.speed)
 
 main()
 
+async function readChapter(epub, i: number) {
+	const bookTitle = epub.metadata.title || "untitled"
+	const chap = epub.flow[ch]
+	const title = chap.id.split(".")[0]
+
+	// get text
+	const html = await getChapter(epub, chap.id)
+	const text = parse(html).textContent
+	// console.log(chap, chap.id, { title })
+
+	// save .txt
+	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+	const textFile = `./${sanitizedTitle}/chapter_${ch}.txt`
+	const outputFile = `./${sanitizedTitle}/chapter_${ch}.mp3`
+	await Bun.write(textFile, text)
+
+	//  make audio
+	console.log({ text })
+	// const audio = await generateSpeech({ text: chapterText, voice, speed })
+	// await audio.save(outputFile)
+}
+
 async function main() {
 	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
-	const id = epub.flow[ch].id
-	const html = await new Promise<string>((resolve, reject) => {
-		epub.getChapter(id, function (error, html) {
+
+	const author = epub.metadata.creator || "author"
+
+	// Chapter
+	await readChapter(epub, ch)
+
+	//---
+
+	// Save the chapter text to a text file (Bun auto-creates directories)
+}
+
+function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4)
+}
+
+function getChapter(epub, id) {
+	return new Promise<string>((resolve, reject) => {
+		epub.getChapter(id, (error, html) => {
 			if (error) {
 				reject(error)
 			} else {
@@ -46,32 +78,4 @@ async function main() {
 			}
 		})
 	})
-
-	const text = parse(html).textContent
-
-	console.log(
-		`Generating audio for chapter ${ch} (voice: ${voice}, speed: ${speed})...`,
-	)
-	console.log(text)
-
-	// Generate speech using local Kokoro
-	const audio = await generateSpeech({ text, voice, speed })
-
-	// Create folder using book title
-	const bookTitle = epub.metadata.title || "unknown_book"
-	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
-	const outputDir = join("./", sanitizedTitle)
-
-	await mkdir(outputDir, { recursive: true })
-
-	// Save the chapter text to a text file
-	const textFile = join(outputDir, `chapter_${ch}.txt`)
-	await Bun.write(textFile, text)
-	console.log(`Text saved to ${textFile}`)
-
-	// Save the audio to an MP3 file
-	const outputFile = join(outputDir, `chapter_${ch}.mp3`)
-	await audio.save(outputFile)
-
-	console.log(`Audio saved to ${outputFile}`)
 }
