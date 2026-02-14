@@ -47,33 +47,137 @@ async function readChapter(epub, i: number) {
 	await Bun.write(textFile, text)
 
 	//  make audio
-	chunkify(text)
+	const chunks = chunkify(text)
+	for (const [i, chunk] of chunks.entries()) {
+		console.log(
+			`[${i}] (${estimateTokens(chunk)} tokens) ${chunk.slice(0, 80)}...`,
+		)
+	}
+	console.log(`Total chunks: ${chunks.length}`)
 	// const audio = await generateSpeech({ text: chapterText, voice, speed })
 	// await audio.save(outputFile)
 }
 
-const nextPunct = (text: string, start: number) => {
-	const afterStart = text.slice(start)
-	const majorIndex = afterStart.search(/[\.\?\!]/)
-	const minorIndex = afterStart.search(/[,;:\-—]/)
-	return [
-		majorIndex >= 0 ? start + majorIndex : -1,
-		minorIndex >= 0 ? start + minorIndex : -1,
-	]
+/** Find the end of the current sentence and all minor break points within it. */
+function findSentenceEnd(
+	text: string,
+	start: number,
+): { end: number; minorBreaks: number[] } {
+	const minorBreaks: number[] = []
+	let i = start
+
+	while (i < text.length) {
+		const ch = text[i]
+
+		// Major punctuation — end of sentence
+		if (ch === "." || ch === "?" || ch === "!") {
+			// Consume consecutive sentence-ending punctuation (e.g. "...", "?!", "!!!")
+			while (
+				i + 1 < text.length &&
+				(text[i + 1] === "." || text[i + 1] === "?" || text[i + 1] === "!")
+			) {
+				i++
+			}
+			return { end: i + 1, minorBreaks }
+		}
+
+		// Minor punctuation — record as potential break point
+		if (ch === "," || ch === ";" || ch === ":" || ch === "—" || ch === "-") {
+			minorBreaks.push(i + 1) // index after the punctuation
+		}
+
+		i++
+	}
+
+	// No sentence-ending punctuation found — treat end of text as sentence end
+	return { end: text.length, minorBreaks }
 }
 
-function chunkify(text: string) {
-	let pos = 0
-	console.log({ text })
+/** Find the best minor break point that keeps the first part under maxTokens. */
+function splitAtMinorBreak(
+	text: string,
+	start: number,
+	minorBreaks: number[],
+	maxTokens: number,
+): number {
+	const maxChars = maxTokens * 4 // inverse of estimateTokens
+	const limit = start + maxChars
 
-	for (let x = 0; x < 10; x++) {
-		const [mj, mn] = nextPunct(text, pos)
-		console.log({ mj, mn })
-		// if majoy is too long then use  minor
-		// if major is too short, get next major after that
-		// get that chunk of text
+	// Find the last minor break that stays within the limit
+	let best = -1
+	for (const bp of minorBreaks) {
+		if (bp <= limit) best = bp
+		else break
 	}
-	return
+
+	if (best > start) return best
+
+	// No suitable minor break — fall back to word boundary near the char limit
+	let fallback = Math.min(limit, text.length)
+	while (fallback > start && text[fallback] !== " ") fallback--
+	return fallback > start ? fallback : Math.min(limit, text.length)
+}
+
+/** Drain text that may exceed MAX_TOKENS by splitting at minor punctuation. */
+function drainOversized(text: string, chunks: string[]): string {
+	let remaining = text
+	while (estimateTokens(remaining) > MAX_TOKENS) {
+		const breaks: number[] = []
+		for (let i = 0; i < remaining.length; i++) {
+			const ch = remaining[i]
+			if (ch === "," || ch === ";" || ch === ":" || ch === "—" || ch === "-") {
+				breaks.push(i + 1)
+			}
+		}
+		const splitPoint = splitAtMinorBreak(remaining, 0, breaks, MAX_TOKENS)
+		chunks.push(remaining.slice(0, splitPoint).trim())
+		remaining = remaining.slice(splitPoint).trim()
+	}
+	return remaining
+}
+
+/** Split text into chunks respecting token limits and sentence boundaries. */
+function chunkify(text: string): string[] {
+	const chunks: string[] = []
+	let pos = 0
+	let buffer = ""
+
+	while (pos < text.length) {
+		const { end } = findSentenceEnd(text, pos)
+		const sentence = text.slice(pos, end).trim()
+		pos = end
+
+		if (sentence.length === 0) continue
+
+		const candidate = buffer ? buffer + " " + sentence : sentence
+		const tokens = estimateTokens(candidate)
+
+		if (tokens < MIN_TOKENS) {
+			buffer = candidate
+			continue
+		}
+
+		if (tokens <= MAX_TOKENS) {
+			chunks.push(candidate.trim())
+			buffer = ""
+			continue
+		}
+
+		// Too long — need to split
+		if (buffer && estimateTokens(buffer) >= MIN_TOKENS) {
+			// Buffer alone is viable — emit it, handle sentence separately
+			chunks.push(buffer.trim())
+			buffer = drainOversized(sentence, chunks)
+			continue
+		}
+
+		// Buffer too short to emit alone — split the combined candidate
+		buffer = drainOversized(candidate, chunks)
+	}
+
+	if (buffer.trim()) chunks.push(buffer.trim())
+
+	return chunks
 }
 async function main() {
 	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
