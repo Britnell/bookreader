@@ -3,16 +3,12 @@ const OPTIMAL_TOKENS = 80 // optimal max
 const MAX_TOKENS = 100 // max
 
 /** Estimate tokens (roughly 1 token per 4 characters for English) */
-export function estimateTokens(text: string): number {
+function estimateTokens(text: string): number {
 	return Math.ceil(text.length / 4)
 }
 
-/** Find the end of the current sentence and all minor break points within it. */
-export function findSentenceEnd(
-	text: string,
-	start: number,
-): { end: number; minorBreaks: number[] } {
-	const minorBreaks: number[] = []
+/** Find the end of the current sentence (index after terminal punctuation). */
+function findSentenceEnd(text: string, start: number): number {
 	let i = start
 
 	while (i < text.length) {
@@ -27,30 +23,23 @@ export function findSentenceEnd(
 			) {
 				i++
 			}
-			return { end: i + 1, minorBreaks }
-		}
-
-		// Minor punctuation — record as potential break point
-		if (ch === "," || ch === ";" || ch === ":" || ch === "—" || ch === "-") {
-			minorBreaks.push(i + 1) // index after the punctuation
+			return i + 1
 		}
 
 		i++
 	}
 
 	// No sentence-ending punctuation found — treat end of text as sentence end
-	return { end: text.length, minorBreaks }
+	return text.length
 }
 
 /** Find the best minor break point that keeps the first part under maxTokens. */
-export function splitAtMinorBreak(
+function splitAtMinorBreak(
 	text: string,
-	start: number,
 	minorBreaks: number[],
 	maxTokens: number,
 ): number {
-	const maxChars = maxTokens * 4 // inverse of estimateTokens
-	const limit = start + maxChars
+	const limit = maxTokens * 4 // inverse of estimateTokens
 
 	// Find the last minor break that stays within the limit
 	let best = -1
@@ -59,16 +48,16 @@ export function splitAtMinorBreak(
 		else break
 	}
 
-	if (best > start) return best
+	if (best > 0) return best
 
 	// No suitable minor break — fall back to word boundary near the char limit
 	let fallback = Math.min(limit, text.length)
-	while (fallback > start && text[fallback] !== " ") fallback--
-	return fallback > start ? fallback : Math.min(limit, text.length)
+	while (fallback > 0 && text[fallback] !== " ") fallback--
+	return fallback > 0 ? fallback : Math.min(limit, text.length)
 }
 
 /** Drain text that exceeds OPTIMAL_TOKENS by splitting at minor punctuation. */
-export function drainOversized(text: string, chunks: string[]): string {
+function drainOversized(text: string, chunks: string[]): string {
 	let remaining = text
 	while (estimateTokens(remaining) > OPTIMAL_TOKENS) {
 		const breaks: number[] = []
@@ -78,7 +67,7 @@ export function drainOversized(text: string, chunks: string[]): string {
 				breaks.push(i + 1)
 			}
 		}
-		const splitPoint = splitAtMinorBreak(remaining, 0, breaks, OPTIMAL_TOKENS)
+		const splitPoint = splitAtMinorBreak(remaining, breaks, OPTIMAL_TOKENS)
 		chunks.push(remaining.slice(0, splitPoint).trim())
 		remaining = remaining.slice(splitPoint).trim()
 	}
@@ -92,9 +81,9 @@ export function chunkify(text: string): string[] {
 	let buffer = ""
 
 	while (pos < text.length) {
-		const { end } = findSentenceEnd(text, pos)
-		const sentence = text.slice(pos, end).trim()
-		pos = end
+		const sentenceEnd = findSentenceEnd(text, pos)
+		const sentence = text.slice(pos, sentenceEnd).trim()
+		pos = sentenceEnd
 
 		if (sentence.length === 0) continue
 
@@ -110,7 +99,7 @@ export function chunkify(text: string): string[] {
 			// Lookahead: peek at next sentence — if it's short, defer so we
 			// can absorb it on the next iteration
 			if (pos < text.length) {
-				const { end: nextEnd } = findSentenceEnd(text, pos)
+				const nextEnd = findSentenceEnd(text, pos)
 				const nextSentence = text.slice(pos, nextEnd).trim()
 				if (
 					nextSentence.length > 0 &&
