@@ -26,28 +26,37 @@ main()
 
 async function readChapter(epub, i: number) {
 	const bookTitle = epub.metadata.title || "untitled"
-	const chap = epub.flow[ch]
-	const title = chap.id.split(".")[0]
+	const chapter = epub.flow[ch]
+	const chapterTitle = chapter.id.split(".")[0]
 
 	// get text
-	const html = await getChapter(epub, chap.id)
+	const html = await getChapter(epub, chapter.id)
 	const text = parse(html).textContent
-	// console.log(chap, chap.id, { title })
+	// console.log(chapter, chapter.id, { chapterTitle })
 
 	// save .txt
 	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
-	const textFile = `./${sanitizedTitle}/chapter_${ch}.txt`
-	const outputFile = `./${sanitizedTitle}/chapter_${ch}.mp3`
+	const outputDir = `./${sanitizedTitle}`
+
+	// Ensure directory exists
+	await Bun.file(outputDir).ensureDir?.()
+
+	const textFile = `${outputDir}/${chapterTitle}.txt`
 	await Bun.write(textFile, text)
 
-	//  make audio
+	// make audio chunks
 	const chunks = chunkify(text)
-	for (const [i, chunk] of chunks.entries()) {
-		console.log(`[${i}] (${chunk.length / 4} chunks) ${chunk.slice(0, 80)}...`)
+
+	// Generate audio for each chunk synchronously
+	for (let i = 0; i < chunks.length; i++) {
+		const text = chunks[i]
+		console.log(`Generating chunk ${i + 1} , ${text.length}`)
+		const audio = await generateSpeech({ text, voice, speed })
+		await audio.save(`${outputDir}/${chapterTitle}_${i}.wav`)
 	}
-	console.log(`Total chunks: ${chunks.length}`)
-	// const audio = await generateSpeech({ text: chapterText, voice, speed })
-	// await audio.save(outputFile)
+
+	// join chunks
+	const names = chunks.map((_, i) => `${outputDir}/${chapterTitle}_${i}.wav`)
 }
 
 async function main() {
