@@ -40,7 +40,6 @@ async function main() {
 			continue
 		}
 
-		console.log(`chapter ${i + 1}/${epub.flow.length} : ${chapterTitle}`)
 		await readChapter(epub, chapter, i)
 	}
 	console.log("done")
@@ -121,8 +120,9 @@ async function readChapter(epub, chapter, index: number) {
 	}
 
 	// Join chunks with ffmpeg
-	console.log("join chapter chunks + cleanup")
+	console.log("  join chapter chunks + cleanup")
 	await joinAudioChunks(outputDir, chapterFileName, chunks.length)
+	console.log("  chapter done")
 }
 
 function getChapter(epub, id) {

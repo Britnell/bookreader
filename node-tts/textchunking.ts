@@ -1,6 +1,6 @@
-const MIN_TOKENS = 40 // never below
-const OPTIMAL_TOKENS = 80 // optimal below
-const MAX_TOKENS = 110 // max
+const MIN_TOKENS = 40 // absolute min
+const OPTIMAL_TOKENS = 80 // optimal max
+const MAX_TOKENS = 100 // max
 
 /** Estimate tokens (roughly 1 token per 4 characters for English) */
 export function estimateTokens(text: string): number {
