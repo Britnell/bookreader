@@ -25,10 +25,19 @@ const speed = parseFloat(values.speed)
 
 main()
 
-async function chapterExists(epub, chapter): Promise<boolean> {
+function getBookAndChapterTitles(epub, chapter) {
 	const bookTitle = epub.metadata.title || "untitled"
 	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
 	const chapterTitle = chapter.id.split(".")[0]
+
+	return { sanitizedTitle, chapterTitle }
+}
+
+async function chapterExists(epub, chapter): Promise<boolean> {
+	const { sanitizedTitle, chapterTitle } = getBookAndChapterTitles(
+		epub,
+		chapter,
+	)
 	const outputDir = `./${sanitizedTitle}`
 	const audioFile = `${outputDir}/${chapterTitle}.wav`
 
@@ -36,15 +45,16 @@ async function chapterExists(epub, chapter): Promise<boolean> {
 }
 
 async function readChapter(epub, chapter) {
-	const bookTitle = epub.metadata.title || "untitled"
-	const chapterTitle = chapter.id.split(".")[0]
+	const { sanitizedTitle, chapterTitle } = getBookAndChapterTitles(
+		epub,
+		chapter,
+	)
 
 	// get text
 	const html = await getChapter(epub, chapter.id)
 	const text = parse(html).textContent
 
 	// save .txt
-	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
 	const outputDir = `./${sanitizedTitle}`
 
 	// Ensure directory exists
