@@ -25,15 +25,23 @@ const speed = parseFloat(values.speed)
 
 main()
 
-async function readChapter(epub, i: number) {
+async function chapterExists(epub, chapter): Promise<boolean> {
 	const bookTitle = epub.metadata.title || "untitled"
-	const chapter = epub.flow[ch]
+	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+	const chapterTitle = chapter.id.split(".")[0]
+	const outputDir = `./${sanitizedTitle}`
+	const audioFile = `${outputDir}/${chapterTitle}.wav`
+
+	return await Bun.file(audioFile).exists()
+}
+
+async function readChapter(epub, chapter) {
+	const bookTitle = epub.metadata.title || "untitled"
 	const chapterTitle = chapter.id.split(".")[0]
 
 	// get text
 	const html = await getChapter(epub, chapter.id)
 	const text = parse(html).textContent
-	// console.log(chapter, chapter.id, { chapterTitle })
 
 	// save .txt
 	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
@@ -66,16 +74,26 @@ async function main() {
 
 	const author = epub.metadata.creator || "author"
 
-	// Chapter
-	// await readChapter(epub, ch)
+	// Process all chapters
+	for (let i = 0; i < epub.flow.length; i++) {
+		const chapter = epub.flow[i]
+		const chapterTitle = chapter.id.split(".")[0]
 
-	epub.flow.forEach((flow, f) => {
-		console.log(flow, f)
-	})
+		// Check if chapter already exists
+		if (await chapterExists(epub, chapter)) {
+			console.log(
+				`Chapter ${i + 1}/${epub.flow.length}: ${chapterTitle} already exists, skipping...`,
+			)
+			continue
+		}
 
-	//---
+		console.log(
+			`Processing chapter ${i + 1}/${epub.flow.length}: ${chapterTitle}`,
+		)
+		await readChapter(epub, chapter)
+	}
 
-	// Save the chapter text to a text file (Bun auto-creates directories)
+	console.log("All chapters processed!")
 }
 
 function getChapter(epub, id) {
