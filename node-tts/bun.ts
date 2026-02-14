@@ -101,10 +101,18 @@ async function readChapter(epub, chapter) {
 
 	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
+		const chunkPath = `${outputDir}/${chapterTitle}_${i}.wav`
+
+		// Check if chunk already exists
+		if (await Bun.file(chunkPath).exists()) {
+			console.log(`Chunk ${i + 1} already exists, skipping generation`)
+			continue
+		}
+
 		const text = chunks[i]
 		console.log(`Generating chunk ${i + 1} , ${text.length}`)
 		const audio = await generateSpeech({ text, voice, speed })
-		await audio.save(`${outputDir}/${chapterTitle}_${i}.wav`)
+		await audio.save(chunkPath)
 	}
 
 	// Join chunks with ffmpeg
