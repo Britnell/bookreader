@@ -113,9 +113,20 @@ export function chunkify(text: string): string[] {
 			if (pos < text.length) {
 				const { end: nextEnd } = findSentenceEnd(text, pos)
 				const nextSentence = text.slice(pos, nextEnd).trim()
-				if (nextSentence.length > 0) {
+				if (
+					nextSentence.length > 0 &&
+					estimateTokens(nextSentence) < MIN_TOKENS
+				) {
 					const withNext = candidate + " " + nextSentence
-					if (estimateTokens(withNext) <= UPPER_TOKENS) {
+					const isLastSentence = text.slice(nextEnd).trim().length === 0
+					// Absorb a short next sentence if combined stays in optimal range
+					if (estimateTokens(withNext) <= OPTIMAL_TOKENS) {
+						buffer = candidate
+						continue
+					}
+					// Last sentence exception: absorb a short trailing sentence
+					// even above optimal, as long as we stay under MAX
+					if (isLastSentence && estimateTokens(withNext) <= MAX_TOKENS) {
 						buffer = candidate
 						continue
 					}
