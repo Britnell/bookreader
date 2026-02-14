@@ -105,12 +105,13 @@ async function readChapter(epub, chapter) {
 
 		// Check if chunk already exists
 		if (await Bun.file(chunkPath).exists()) {
-			console.log(`Chunk ${i + 1} already exists, skipping generation`)
+			// console.log(`Chunk ${i + 1} already exists, skipping generation`)
 			continue
 		}
 
 		const text = chunks[i]
 		console.log(`Generating chunk ${i + 1} , ${text.length}`)
+		console.log({ i, text })
 		const audio = await generateSpeech({ text, voice, speed })
 		await audio.save(chunkPath)
 	}

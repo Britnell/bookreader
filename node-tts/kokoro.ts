@@ -1,15 +1,15 @@
-import { KokoroTTS } from "kokoro-js";
+import { KokoroTTS } from "kokoro-js"
 
-export type Voice = (typeof voices)[number];
-export type DataType = "fp32" | "fp16" | "q8" | "q4" | "q4f16";
-export type Device = "cpu" | "wasm" | "webgpu";
-const dtype = "fp16";
-const device = "cpu";
+export type Voice = (typeof voices)[number]
+export type DataType = "fp32" | "fp16" | "q8" | "q4" | "q4f16"
+export type Device = "cpu" | "wasm" | "webgpu"
+const dtype = "fp32" // fp16 has NaN issues https://github.com/hexgrad/kokoro/issues/74
+const device = "cpu"
 
 export interface GenerateSpeechOptions {
-	text: string;
-	voice?: Voice;
-	speed?: number;
+	text: string
+	voice?: Voice
+	speed?: number
 }
 
 /**
@@ -22,18 +22,18 @@ export async function generateSpeech({
 	voice = "af_heart",
 	speed = 1,
 }: GenerateSpeechOptions) {
-	const model_id = "onnx-community/Kokoro-82M-v1.0-ONNX";
+	const model_id = "onnx-community/Kokoro-82M-v1.0-ONNX"
 	const tts = await KokoroTTS.from_pretrained(model_id, {
 		dtype,
 		device,
-	});
+	})
 
 	const audio = await tts.generate(text, {
 		voice,
 		speed,
-	});
+	})
 
-	return audio;
+	return audio
 }
 
 export const voices = [
@@ -65,4 +65,4 @@ export const voices = [
 	"am_onyx",
 	"am_puck",
 	"am_santa",
-] as const;
+] as const
