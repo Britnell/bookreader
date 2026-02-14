@@ -1,4 +1,5 @@
 node-tts/*/
+*.epub
 
 # Logs
 logs

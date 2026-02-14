@@ -10,7 +10,7 @@ const { values } = parseArgs({
 	args: Bun.argv,
 	options: {
 		file: { type: "string", short: "f", default: "book.epub" },
-		chapter: { type: "string", short: "c", default: "1" },
+		// chapter: { type: "string", short: "c", default: "1" },
 		voice: { type: "string", short: "v", default: "bf_emma" },
 		speed: { type: "string", short: "s", default: "1" },
 	},
@@ -19,11 +19,32 @@ const { values } = parseArgs({
 })
 
 const file = values.file
-const ch = parseInt(values.chapter, 10)
+// const ch = parseInt(values.chapter, 10)
 const voice = values.voice as Voice
 const speed = parseFloat(values.speed)
 
 main()
+
+async function main() {
+	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
+
+	const author = epub.metadata.creator || "author"
+
+	// Process all chapters
+	for (let i = 0; i < epub.flow.length; i++) {
+		const chapter = epub.flow[i]
+		const chapterTitle = chapter.id.split(".")[0]
+
+		// Check if chapter already exists
+		if (await chapterExists(epub, chapter)) {
+			continue
+		}
+
+		console.log(`chapter ${i + 1}/${epub.flow.length} : ${chapterTitle}`)
+		await readChapter(epub, chapter)
+	}
+	console.log("done")
+}
 
 function getBookAndChapterTitles(epub, chapter) {
 	const bookTitle = epub.metadata.title || "untitled"
@@ -54,6 +75,12 @@ async function readChapter(epub, chapter) {
 	const html = await getChapter(epub, chapter.id)
 	const text = parse(html).textContent
 
+	// Skip empty chapters
+	if (!text.trim()) {
+		console.log(`Skipping empty chapter: ${chapterTitle}`)
+		return
+	}
+
 	// save .txt
 	const outputDir = `./${sanitizedTitle}`
 
@@ -66,6 +93,12 @@ async function readChapter(epub, chapter) {
 	// make audio chunks
 	const chunks = chunkify(text)
 
+	// Skip if no chunks (shouldn't happen after empty text check, but just in case)
+	if (chunks.length === 0) {
+		console.log(`No chunks generated for chapter: ${chapterTitle}`)
+		return
+	}
+
 	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
 		const text = chunks[i]
@@ -77,33 +110,6 @@ async function readChapter(epub, chapter) {
 	// Join chunks with ffmpeg
 	console.log("join chapter chunks + cleanup")
 	await joinAudioChunks(outputDir, chapterTitle, chunks.length)
-}
-
-async function main() {
-	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
-
-	const author = epub.metadata.creator || "author"
-
-	// Process all chapters
-	for (let i = 0; i < epub.flow.length; i++) {
-		const chapter = epub.flow[i]
-		const chapterTitle = chapter.id.split(".")[0]
-
-		// Check if chapter already exists
-		if (await chapterExists(epub, chapter)) {
-			console.log(
-				`Chapter ${i + 1}/${epub.flow.length}: ${chapterTitle} already exists, skipping...`,
-			)
-			continue
-		}
-
-		console.log(
-			`Processing chapter ${i + 1}/${epub.flow.length}: ${chapterTitle}`,
-		)
-		await readChapter(epub, chapter)
-	}
-
-	console.log("All chapters processed!")
 }
 
 function getChapter(epub, id) {
