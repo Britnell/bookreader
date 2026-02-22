@@ -37,6 +37,9 @@ async function main() {
 
 		// Check if chapter already exists
 		if (await chapterExists(epub, chapter, i)) {
+			console.log(
+				` # chapter ${chapter.title || chapter.href} exists ${i} / ${epub.flow.length}`,
+			)
 			continue
 		}
 
@@ -48,11 +51,10 @@ async function main() {
 function getBookAndChapterTitles(epub, chapter, index: number) {
 	const bookTitle = epub.metadata.title || "untitled"
 	const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
-	const chapterTitle = chapter.id.split(".")[0]
+	const chapterTitle =
+		chapter.title || chapter.href.split("/").pop().split(".")[0]
 	const paddedIndex = String(index).padStart(2, "0")
-	const chapterFileName = `${paddedIndex}_${chapterTitle}`
-
-	return { sanitizedTitle, chapterFileName }
+	return { sanitizedTitle, chapterFileName: `${paddedIndex}_${chapterTitle}` }
 }
 
 async function chapterExists(epub, chapter, index: number): Promise<boolean> {
@@ -80,7 +82,7 @@ async function readChapter(epub, chapter, index: number) {
 
 	// Skip empty chapters
 	if (!text.trim()) {
-		console.log(`Skipping empty chapter: ${chapterFileName}`)
+		console.log(` # Skipping empty chapter: ${chapterFileName}`)
 		return
 	}
 
@@ -113,7 +115,7 @@ async function readChapter(epub, chapter, index: number) {
 		}
 
 		const text = chunks[i]
-		console.log(`Generating chunk ${i + 1} , ${text.length}`)
+		if (i % 10 === 0) console.log(`Generating chunk ${i + 1} of ${text.length}`)
 		// console.log({ i, text, len: text.length / 4 })
 		const audio = await generateSpeech({ text, voice, speed })
 		await audio.save(chunkPath)

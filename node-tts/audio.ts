@@ -38,7 +38,7 @@ export async function joinAudioChunks(
 	await proc.exited
 
 	if (proc.exitCode === 0) {
-		console.log(`✓ Created ${outputFile}`)
+		// console.log(`✓ Created ${outputFile}`)
 
 		// Clean up temp file list
 		await Bun.file(fileListPath).delete?.()
@@ -48,7 +48,7 @@ export async function joinAudioChunks(
 			const chunkFile = `${outputDir}/${chapterTitle}_${i}.wav`
 			await Bun.file(chunkFile).delete?.()
 		}
-		console.log(`✓ Cleaned up ${numChunks} chunk files`)
+		// console.log(`✓ Cleaned up ${numChunks} chunk files`)
 	} else {
 		console.error(`✗ ffmpeg failed with exit code ${proc.exitCode}`)
 	}
