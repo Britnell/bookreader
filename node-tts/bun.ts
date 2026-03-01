@@ -84,9 +84,11 @@ async function chapterExists(epub, chapter, index: number): Promise<boolean> {
 		index,
 	)
 	const outputDir = `./${sanitizedTitle}`
-	const audioFile = `${outputDir}/${chapterFileName}.mp3`
 
-	return await Bun.file(audioFile).exists()
+	return (
+		await Bun.file(`${outputDir}/${chapterFileName}.mp3`).exists() ||
+		await Bun.file(`${outputDir}/${chapterFileName}.wav`).exists()
+	)
 }
 
 async function readChapter(
