@@ -12,3 +12,8 @@ piper is a pain
 https://n4ze3m.com/blog/running-piper-tts-with-javascript-in-the-bun-runtime
 need phonemizer, and download each voice
 later
+
+
+-[ ] demo mode -t "lorem ipsum"
+-[ ] allow supertonic voices
+-[ ] -list voices

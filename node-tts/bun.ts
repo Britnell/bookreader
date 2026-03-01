@@ -4,7 +4,7 @@ import { parse } from "node-html-parser"
 import { parseArgs } from "util"
 import { generateSpeech, type Voice } from "./kokoro.ts"
 import { chunkify } from "./textchunking.ts"
-import { joinAudioChunks } from "./audio.ts"
+import { joinAudioChunks, embedMetadata, type AudioMetadata } from "./audio.ts"
 
 const { values } = parseArgs({
 	args: Bun.argv,
@@ -29,11 +29,26 @@ async function main() {
 	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
 
 	const author = epub.metadata.creator || "author"
+	const bookTitle = epub.metadata.title || "untitled"
+
+	// Extract cover image if available
+	let coverImagePath: string | undefined
+	if (epub.metadata.cover) {
+		try {
+			const { buffer, mimeType } = await getImage(epub, epub.metadata.cover)
+			const ext = mimeType.split("/")[1] || "jpg"
+			const sanitizedTitle = bookTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+			coverImagePath = `./tmp/cover_${sanitizedTitle}.${ext}`
+			await Bun.write(coverImagePath, buffer)
+			console.log(`Cover extracted: ${coverImagePath}`)
+		} catch (e) {
+			console.warn("Could not extract cover image:", e)
+		}
+	}
 
 	// Process all chapters
 	for (let i = 0; i < epub.flow.length; i++) {
 		const chapter = epub.flow[i]
-		const chapterTitle = chapter.id.split(".")[0]
 
 		// Check if chapter already exists
 		if (await chapterExists(epub, chapter, i)) {
@@ -43,7 +58,12 @@ async function main() {
 			continue
 		}
 
-		await readChapter(epub, chapter, i)
+		await readChapter(epub, chapter, i, {
+			author,
+			bookTitle,
+			coverImagePath,
+			totalTracks: epub.flow.length,
+		})
 	}
 	console.log("done")
 }
@@ -64,12 +84,17 @@ async function chapterExists(epub, chapter, index: number): Promise<boolean> {
 		index,
 	)
 	const outputDir = `./${sanitizedTitle}`
-	const audioFile = `${outputDir}/${chapterFileName}.wav`
+	const audioFile = `${outputDir}/${chapterFileName}.mp3`
 
 	return await Bun.file(audioFile).exists()
 }
 
-async function readChapter(epub, chapter, index: number) {
+async function readChapter(
+	epub,
+	chapter,
+	index: number,
+	bookMeta: { author: string; bookTitle: string; coverImagePath?: string; totalTracks: number },
+) {
 	const { sanitizedTitle, chapterFileName } = getBookAndChapterTitles(
 		epub,
 		chapter,
@@ -115,8 +140,8 @@ async function readChapter(epub, chapter, index: number) {
 		}
 
 		const text = chunks[i]
-		if (i % 10 === 0) console.log(`Generating chunk ${i + 1} of ${text.length}`)
-		// console.log({ i, text, len: text.length / 4 })
+		if (i % 10 === 0)
+			console.log(`Generating chunk ${i + 1} of ${chunks.length}`)
 		const audio = await generateSpeech({ text, voice, speed })
 		await audio.save(chunkPath)
 	}
@@ -124,6 +149,20 @@ async function readChapter(epub, chapter, index: number) {
 	// Join chunks with ffmpeg
 	console.log("  join chapter chunks + cleanup")
 	await joinAudioChunks(outputDir, chapterFileName, chunks.length)
+
+	// Embed metadata and convert to mp3
+	console.log("  embedding metadata")
+	const chapterTitle = chapter.title || chapterFileName
+	const wavPath = `${outputDir}/${chapterFileName}.wav`
+	const mp3Path = `${outputDir}/${chapterFileName}.mp3`
+	await embedMetadata(wavPath, mp3Path, {
+		title: chapterTitle,
+		album: bookMeta.bookTitle,
+		artist: bookMeta.author,
+		trackNumber: index + 1,
+		totalTracks: bookMeta.totalTracks,
+		coverImagePath: bookMeta.coverImagePath,
+	})
 	console.log("  chapter done")
 }
 
@@ -135,6 +174,15 @@ function getChapter(epub, id) {
 			} else {
 				resolve(html)
 			}
+		})
+	})
+}
+
+function getImage(epub, id): Promise<{ buffer: Buffer; mimeType: string }> {
+	return new Promise((resolve, reject) => {
+		epub.getImage(id, (error, buffer, mimeType) => {
+			if (error) reject(error)
+			else resolve({ buffer, mimeType })
 		})
 	})
 }

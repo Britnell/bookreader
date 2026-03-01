@@ -38,8 +38,6 @@ export async function joinAudioChunks(
 	await proc.exited
 
 	if (proc.exitCode === 0) {
-		// console.log(`✓ Created ${outputFile}`)
-
 		// Clean up temp file list
 		await Bun.file(fileListPath).delete?.()
 
@@ -48,8 +46,55 @@ export async function joinAudioChunks(
 			const chunkFile = `${outputDir}/${chapterTitle}_${i}.wav`
 			await Bun.file(chunkFile).delete?.()
 		}
-		// console.log(`✓ Cleaned up ${numChunks} chunk files`)
 	} else {
 		console.error(`✗ ffmpeg failed with exit code ${proc.exitCode}`)
+	}
+}
+
+export interface AudioMetadata {
+	title: string
+	album: string
+	artist: string
+	trackNumber: number
+	totalTracks: number
+	coverImagePath?: string
+}
+
+export async function embedMetadata(
+	wavPath: string,
+	mp3Path: string,
+	meta: AudioMetadata,
+) {
+	const args = ["ffmpeg", "-y", "-i", wavPath]
+
+	if (meta.coverImagePath) {
+		args.push("-i", meta.coverImagePath)
+	}
+
+	args.push(
+		"-map", "0:a",
+		...(meta.coverImagePath ? ["-map", "1:v"] : []),
+		"-c:a", "libmp3lame",
+		"-b:a", "192k",
+		...(meta.coverImagePath ? ["-c:v", "copy", "-id3v2_version", "3"] : []),
+		"-metadata", `title=${meta.title}`,
+		"-metadata", `album=${meta.album}`,
+		"-metadata", `artist=${meta.artist}`,
+		"-metadata", `track=${meta.trackNumber}/${meta.totalTracks}`,
+		mp3Path,
+	)
+
+	const proc = Bun.spawn(args, {
+		cwd: process.cwd(),
+		stdout: "ignore",
+		stderr: "ignore",
+	})
+
+	await proc.exited
+
+	if (proc.exitCode === 0) {
+		await Bun.file(wavPath).delete?.()
+	} else {
+		console.error(`✗ ffmpeg metadata embedding failed for ${mp3Path}`)
 	}
 }
