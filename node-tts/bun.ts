@@ -2,7 +2,7 @@
 import { EPub } from "epub2"
 import { parse } from "node-html-parser"
 import { parseArgs } from "util"
-import { generateSpeech, type Voice } from "./kokoro.ts"
+import { generateSpeech, voices, type Voice } from "./kokoro.ts"
 import { chunkify } from "./textchunking.ts"
 import { joinAudioChunks, embedMetadata, type AudioMetadata } from "./audio.ts"
 
@@ -10,18 +10,62 @@ const { values } = parseArgs({
 	args: Bun.argv,
 	options: {
 		file: { type: "string", short: "f", default: "book.epub" },
-		// chapter: { type: "string", short: "c", default: "1" },
 		voice: { type: "string", short: "v", default: "bf_emma" },
 		speed: { type: "string", short: "s", default: "1" },
+		text: { type: "string", short: "t" },
+		list: { type: "boolean", short: "l" },
+		help: { type: "boolean", short: "h" },
 	},
 	strict: true,
 	allowPositionals: true,
 })
 
-const file = values.file
-// const ch = parseInt(values.chapter, 10)
-const voice = values.voice as Voice
-const speed = parseFloat(values.speed)
+if (values.help) {
+	console.log(`
+USAGE
+  bun bun.ts [options]
+
+OPTIONS
+  -f, --file <path>    ePub file to convert  (default: book.epub)
+  -v, --voice <name>   Voice to use          (default: bf_emma)
+  -s, --speed <num>    Speech speed          (default: 1)
+  -t, --text <text>    Speak text and play it (test mode, no file needed)
+  -l, --list           List all available voices
+  -h, --help           Show this help
+
+EXAMPLES
+  bun bun.ts -f mybook.epub
+  bun bun.ts -f mybook.epub -v am_michael -s 1.2
+  bun bun.ts -t "Hello world" -v bf_alice
+  bun bun.ts --list
+`)
+	process.exit(0)
+}
+
+if (values.list) {
+	console.log(` Kokoro Voices: \n` + voices.join("\n"))
+	process.exit(0)
+}
+
+const voice = (values.voice ?? "bf_emma") as Voice
+const speed = parseFloat(values.speed ?? "1")
+
+if (!voices.includes(voice)) {
+	console.error(`Error: unknown voice "${voice}"\n`)
+	console.log(` Kokoro Voices: \n` + voices.join("\n"))
+	process.exit(1)
+}
+
+if (values.text) {
+	const audio = await generateSpeech({ text: values.text, voice, speed })
+	const tmpPath = "./tmp/_test.wav"
+	await audio.save(tmpPath)
+	const proc = Bun.spawn(["ffplay", "-nodisp", "-autoexit", tmpPath], { stdout: "ignore", stderr: "ignore" })
+	await proc.exited
+	process.exit(0)
+}
+
+const file = values.file ?? "book.epub"
 
 main()
 
@@ -86,8 +130,8 @@ async function chapterExists(epub, chapter, index: number): Promise<boolean> {
 	const outputDir = `./${sanitizedTitle}`
 
 	return (
-		await Bun.file(`${outputDir}/${chapterFileName}.mp3`).exists() ||
-		await Bun.file(`${outputDir}/${chapterFileName}.wav`).exists()
+		(await Bun.file(`${outputDir}/${chapterFileName}.mp3`).exists()) ||
+		(await Bun.file(`${outputDir}/${chapterFileName}.wav`).exists())
 	)
 }
 
@@ -95,7 +139,12 @@ async function readChapter(
 	epub,
 	chapter,
 	index: number,
-	bookMeta: { author: string; bookTitle: string; coverImagePath?: string; totalTracks: number },
+	bookMeta: {
+		author: string
+		bookTitle: string
+		coverImagePath?: string
+		totalTracks: number
+	},
 ) {
 	const { sanitizedTitle, chapterFileName } = getBookAndChapterTitles(
 		epub,

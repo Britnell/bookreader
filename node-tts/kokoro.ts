@@ -39,7 +39,7 @@ export async function generateSpeech({
 		speed,
 	})
 
-	if (audio.data?.some((value: number) => Number.isNaN(value))) {
+	if (audio.audio?.some((value: number) => Number.isNaN(value))) {
 		console.log(" NaN", text)
 	}
 
