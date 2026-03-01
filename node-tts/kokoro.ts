@@ -17,16 +17,22 @@ export interface GenerateSpeechOptions {
  * @param options - Generation options
  * @returns Audio object with save() method
  */
+const model_id = "onnx-community/Kokoro-82M-v1.0-ONNX"
+let _tts: KokoroTTS | null = null
+
+async function getTTS(): Promise<KokoroTTS> {
+	if (!_tts) {
+		_tts = await KokoroTTS.from_pretrained(model_id, { dtype, device })
+	}
+	return _tts
+}
+
 export async function generateSpeech({
 	text,
 	voice = "af_heart",
 	speed = 1,
 }: GenerateSpeechOptions) {
-	const model_id = "onnx-community/Kokoro-82M-v1.0-ONNX"
-	const tts = await KokoroTTS.from_pretrained(model_id, {
-		dtype,
-		device,
-	})
+	const tts = await getTTS()
 
 	const audio = await tts.generate(text, {
 		voice,

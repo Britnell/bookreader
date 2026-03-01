@@ -141,10 +141,10 @@ async function readChapter(
 			continue
 		}
 
-		const text = chunks[i]
+		const chunk = chunks[i]
 		if (i % 10 === 0)
 			console.log(`Generating chunk ${i + 1} of ${chunks.length}`)
-		const audio = await generateSpeech({ text, voice, speed })
+		const audio = await generateSpeech({ text: chunk, voice, speed })
 		await audio.save(chunkPath)
 	}
 
