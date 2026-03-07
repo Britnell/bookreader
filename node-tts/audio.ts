@@ -1,10 +1,11 @@
 export async function joinAudioChunks(
+	chunksDir: string,
 	outputDir: string,
 	chapterTitle: string,
 	numChunks: number,
 ) {
 	const outputFile = `${outputDir}/${chapterTitle}.wav`
-	const fileListPath = `${outputDir}/chunklist.txt`
+	const fileListPath = `${chunksDir}/chunklist.txt`
 
 	// Create file list for concat demuxer
 	const fileListContent = Array.from(
@@ -29,7 +30,7 @@ export async function joinAudioChunks(
 			outputFile,
 		],
 		{
-			cwd: process.cwd(),
+			cwd: chunksDir,
 			stdout: "ignore",
 			stderr: "ignore",
 		},
@@ -43,7 +44,7 @@ export async function joinAudioChunks(
 
 		// Delete chunk files
 		for (let i = 0; i < numChunks; i++) {
-			const chunkFile = `${outputDir}/${chapterTitle}_${i}.wav`
+			const chunkFile = `${chunksDir}/${chapterTitle}_${i}.wav`
 			await Bun.file(chunkFile).delete?.()
 		}
 	} else {

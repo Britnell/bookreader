@@ -191,9 +191,12 @@ async function readChapter(
 		return
 	}
 
+	const chunksDir = `./tmp/${sanitizedTitle}`
+	await Bun.write(`${chunksDir}/.keep`, "")
+
 	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
-		const chunkPath = `${outputDir}/${chapterFileName}_${i}.wav`
+		const chunkPath = `${chunksDir}/${chapterFileName}_${i}.wav`
 
 		// Check if chunk already exists
 		if (await Bun.file(chunkPath).exists()) {
@@ -210,7 +213,7 @@ async function readChapter(
 
 	// Join chunks with ffmpeg
 	console.log("  join chapter chunks + cleanup")
-	await joinAudioChunks(outputDir, chapterFileName, chunks.length)
+	await joinAudioChunks(chunksDir, outputDir, chapterFileName, chunks.length)
 
 	// Embed metadata and convert to mp3
 	console.log("  embedding metadata")
