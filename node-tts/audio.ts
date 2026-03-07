@@ -7,7 +7,7 @@ export async function joinAudioChunks(
 	const outputFile = `${outputDir}/${chapterTitle}.wav`
 	const fileListPath = `${chunksDir}/chunklist.txt`
 
-	// Create file list for concat demuxer
+	// Create file list for concat demuxer (bare filenames, resolved relative to list dir)
 	const fileListContent = Array.from(
 		{ length: numChunks },
 		(_, i) => `file '${chapterTitle}_${i}.wav'`,
@@ -30,7 +30,6 @@ export async function joinAudioChunks(
 			outputFile,
 		],
 		{
-			cwd: chunksDir,
 			stdout: "ignore",
 			stderr: "ignore",
 		},
@@ -73,15 +72,22 @@ export async function embedMetadata(
 	}
 
 	args.push(
-		"-map", "0:a",
+		"-map",
+		"0:a",
 		...(meta.coverImagePath ? ["-map", "1:v"] : []),
-		"-c:a", "libmp3lame",
-		"-b:a", "192k",
+		"-c:a",
+		"libmp3lame",
+		"-b:a",
+		"192k",
 		...(meta.coverImagePath ? ["-c:v", "copy", "-id3v2_version", "3"] : []),
-		"-metadata", `title=${meta.title}`,
-		"-metadata", `album=${meta.album}`,
-		"-metadata", `artist=${meta.artist}`,
-		"-metadata", `track=${meta.trackNumber}/${meta.totalTracks}`,
+		"-metadata",
+		`title=${meta.title}`,
+		"-metadata",
+		`album=${meta.album}`,
+		"-metadata",
+		`artist=${meta.artist}`,
+		"-metadata",
+		`track=${meta.trackNumber}/${meta.totalTracks}`,
 		mp3Path,
 	)
 
