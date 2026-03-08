@@ -1,4 +1,9 @@
-node-tts/*/
+*.mp3
+*.txt
+*.wav
+*.jpeg
+tmp/
+
 *.epub
 
 # Logs

@@ -107,9 +107,7 @@ async function main() {
 
 		// Check if chapter already exists
 		if (await chapterExists(epub, chapter, i)) {
-			console.log(
-				` # chapter ${chapter.title || chapter.href} exists ${i} / ${epub.flow.length}`,
-			)
+			console.log(`[x] chapter exists ${chapter.title || chapter.href}`)
 			continue
 		}
 
@@ -169,7 +167,7 @@ async function readChapter(
 
 	// Skip empty chapters
 	if (!text.trim()) {
-		console.log(` # Skipping empty chapter: ${chapterFileName}`)
+		console.log(`[x] Skipping empty chapter: ${chapterFileName}`)
 		return
 	}
 
@@ -187,12 +185,13 @@ async function readChapter(
 
 	// Skip if no chunks (shouldn't happen after empty text check, but just in case)
 	if (chunks.length === 0) {
-		console.log(`No chunks generated for chapter: ${chapterFileName}`)
 		return
 	}
 
 	const chunksDir = `./tmp/${sanitizedTitle}`
 	await Bun.write(`${chunksDir}/.keep`, "")
+
+	console.log(`[ ] begin rendering chapter: ${chapterFileName}`)
 
 	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
@@ -206,17 +205,17 @@ async function readChapter(
 
 		const chunk = chunks[i]
 		if (i % 10 === 0)
-			console.log(`Generating chunk ${i + 1} of ${chunks.length}`)
+			console.log(`\tGenerating chunk ${i + 1} of ${chunks.length}`)
 		const audio = await generateSpeech({ text: chunk, voice, speed })
 		await audio.save(chunkPath)
 	}
 
 	// Join chunks with ffmpeg
-	console.log("  join chapter chunks + cleanup")
+	// console.log("  join chapter chunks + cleanup")
 	await joinAudioChunks(chunksDir, outputDir, chapterFileName, chunks.length)
 
 	// Embed metadata and convert to mp3
-	console.log("  embedding metadata")
+	// console.log("  embedding metadata")
 	const chapterTitle = chapter.title || chapterFileName
 	const wavPath = `${outputDir}/${chapterFileName}.wav`
 	const mp3Path = `${outputDir}/${chapterFileName}.mp3`
@@ -228,7 +227,7 @@ async function readChapter(
 		totalTracks: bookMeta.totalTracks,
 		coverImagePath: bookMeta.coverImagePath,
 	})
-	console.log("  chapter done")
+	console.log(`[x] finished chapter: ${chapterFileName}`)
 }
 
 function getChapter(epub, id) {
