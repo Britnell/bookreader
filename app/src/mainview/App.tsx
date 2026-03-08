@@ -19,6 +19,11 @@ type Book = {
 	chapters: string[]
 }
 
+type OpenBookResult = {
+	title: string
+	chapters: string[]
+}
+
 type RPC = {
 	bun: {
 		requests: {
@@ -26,6 +31,9 @@ type RPC = {
 			selectPath: { params: undefined; response: Settings }
 			getBooks: { params: undefined; response: Book[] }
 			addBook: { params: undefined; response: object }
+			removeBook: { params: string; response: object }
+			readBook: { params: string; response: object }
+			openBook: { params: string; response: object }
 		}
 		messages: {}
 	}
@@ -51,47 +59,68 @@ function App() {
 		queryFn: () => electrobun.rpc?.request.settings(),
 	})
 
-	const [openBook, setOpenBook] = useState<Book | undefined>()
+	const [openBook, setOpenBook] = useState<Book | null>(null)
+
+	const { data } = useQuery({
+		queryKey: ["open", openBook?.title],
+		queryFn: async () => {
+			console.log("open")
+			return (
+				electrobun.rpc?.request
+					.openBook(openBook?.title || "")
+					.catch(console.log) || []
+			)
+		},
+		enabled: !!openBook?.title,
+	})
+
+	console.log({ settings })
+	console.log({ openBook })
+	console.log({ data })
 	// const { data: books, refetch: refetchBooks } = useQuery({
 	// 	queryKey: ["books"],
 	// 	queryFn: () => electrobun.rpc?.request.getBooks(),
 	// })
 
-	console.log(settings)
-
 	const selectPath = async () => {
-		const resp = await electrobun.rpc?.request.selectPath()
+		await electrobun.rpc?.request.selectPath()
 		refetchSettings()
 		// resp && setSettings(resp)
 		// await refetchBooks()
 	}
 
 	const addBook = async () => {
-		const resp = await electrobun.rpc?.request.addBook()
+		await electrobun.rpc?.request.addBook()
 		refetchSettings()
-		console.log(resp)
 	}
 
-	console.log(openBook)
+	const removeBook = async (book: Book) => {
+		await electrobun.rpc?.request.removeBook(book.title)
+		refetchSettings()
+		setOpenBook(null)
+	}
+
+	const readBook = async (book: Book) => {
+		await electrobun.rpc?.request.readBook(book.title)
+	}
+
 	return (
 		<div className=" min-h-screen bg-white">
 			<h1 className="x">App</h1>
 
-			<div className="flex ">
-				<p className="">select / change folder for your books: </p>
-				<button className="bg-gray-200 px-1" onClick={selectPath}>
-					select
-				</button>
-			</div>
-
-			<div className="x">
-				<button onClick={() => addBook()} className="border size-20">
-					Add new book
-				</button>
-			</div>
-
 			{!openBook && (
 				<>
+					<div className="flex ">
+						<p className="">select / change folder for your books: </p>
+						<button className="bg-gray-200 px-1" onClick={selectPath}>
+							select
+						</button>
+					</div>
+					<div className="x">
+						<button onClick={() => addBook()} className="border size-20">
+							Add new book
+						</button>
+					</div>
 					<p className="x">Your books: </p>
 					<ul className=" list-disc ml-4">
 						{settings?.books?.map((book) => (
@@ -105,10 +134,30 @@ function App() {
 
 			{openBook && (
 				<div>
-					<button onClick={() => setOpenBook()}>close</button>
+					<div className="flex gap-3">
+						<button
+							className=" px-1 bg-blue-100 mr-auto"
+							onClick={() => readBook(openBook)}
+						>
+							READ
+						</button>
+						<button
+							className=" px-1 bg-blue-100"
+							onClick={() => setOpenBook(null)}
+						>
+							close
+						</button>
+						<button
+							className=" px-1 bg-blue-100"
+							onClick={() => removeBook(openBook)}
+						>
+							remove
+						</button>
+					</div>
+
 					<h2>{openBook.title}</h2>
 					<ul className="list-disc ml-4">
-						{openBook.chapters.map((ch, i) => (
+						{openBook?.chapters?.map((ch, i) => (
 							<li key={i}>{ch}</li>
 						))}
 					</ul>

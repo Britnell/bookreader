@@ -10,6 +10,7 @@ import { join } from "node:path"
 import { homedir } from "node:os"
 import { readdir, mkdir } from "node:fs/promises"
 import { EPub } from "epub2"
+import { parse } from "node-html-parser"
 
 const DEV_SERVER_PORT = 5173
 const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`
@@ -17,6 +18,11 @@ const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`
 type Book = {
 	title: string
 	cover?: string
+	chapters: string[]
+}
+
+type OpenBookResult = {
+	title: string
 	chapters: string[]
 }
 type Settings = {
@@ -61,13 +67,18 @@ function setSetting(updates: Partial<Settings>) {
 
 readSettings()
 
+let openEpub: EPub | null = null
+let openBookTitle: string | null = null
+
 type RPC = {
 	bun: RPCSchema<{
 		requests: {
 			settings: { params: null | object; response: Settings }
 			selectPath: { params: undefined; response: Settings }
 			getBooks: { params: undefined; response: Book[] }
+			removeBook: { params: string; response: object }
 			addBook: { params: undefined; response: object }
+			openBook: { params: string; response: OpenBookResult }
 		}
 	}>
 	webview: RPCSchema<{
@@ -94,23 +105,23 @@ const openBookDialog = () =>
 	})
 
 async function createBook(path: string) {
-	console.log({ path })
 	const epub = await EPub.createAsync(path, "", "")
-
 	const title = epub.metadata.title || "untitled"
-
 	const existing = settings.books.find((b) => b.title === title)
 	if (existing) return existing
 
-	// const slug = title.replace(/[^a-z0-9]/gi, "_").toLowerCase()
 	const chapters = epub.flow.map((chapter, i) => {
 		const paddedIndex = String(i).padStart(2, "0")
-		const chapterTitle = chapter.title || chapter.href.split("/").pop()!.split(".")[0]
+		const chapterTitle =
+			chapter.title || chapter.href.split("/").pop()!.split(".")[0]
 		return `${paddedIndex}_${chapterTitle}`
 	})
 
 	const bookDir = join(settings.path, title)
 	await mkdir(bookDir, { recursive: true })
+
+	// Copy epub into book folder so we can reload it later without the original
+	await Bun.write(join(bookDir, "book.epub"), Bun.file(path))
 
 	if (epub.metadata.cover) {
 		try {
@@ -124,8 +135,20 @@ async function createBook(path: string) {
 	}
 
 	const book = { title, chapters }
-	setSetting({ books: [...settings.books, book] })
+	setSetting({
+		...settings,
+		books: [...settings.books, book],
+	})
 	return book
+}
+
+function getChapterHtml(epub, id): Promise<string> {
+	return new Promise((resolve, reject) => {
+		epub.getChapter(id, (error, html) => {
+			if (error) reject(error)
+			else resolve(html)
+		})
+	})
 }
 
 function getImage(epub, id): Promise<{ buffer: Buffer; mimeType: string }> {
@@ -135,6 +158,37 @@ function getImage(epub, id): Promise<{ buffer: Buffer; mimeType: string }> {
 			else resolve({ buffer, mimeType })
 		})
 	})
+}
+
+async function openBook(title: string) {
+	const book = settings.books.find((b) => b.title === title)
+	if (!book) throw new Error(`Book not found: ${title}`)
+
+	const bookDir = join(settings.path, title)
+
+	openEpub = await EPub.createAsync(join(bookDir, "book.epub"), "", "")
+	openBookTitle = title
+	if (!openEpub) return
+
+	const files = await readdir(bookDir)
+	const results = await Promise.all(
+		openEpub.flow.map(async (chapter, i) => {
+			const paddedIndex = String(i).padStart(2, "0")
+			const chapterTitle =
+				chapter.title || chapter.href.split("/").pop()!.split(".")[0]
+			const name = `${paddedIndex}_${chapterTitle}`
+
+			if (files.includes(`${name}.mp3`)) return name
+
+			const html = await getChapterHtml(openEpub, chapter.id)
+			if (!parse(html).textContent.trim()) return name
+
+			return null
+		}),
+	)
+	const chapters = results.filter(Boolean) as string[]
+
+	return { title, chapters }
 }
 
 const rpc = BrowserView.defineRPC<RPC>({
@@ -156,9 +210,15 @@ const rpc = BrowserView.defineRPC<RPC>({
 				return settings.books
 				// const files = await readdir(settings.path).catch(console.log)
 			},
+			removeBook: (title: string) => {
+				setSetting({
+					...settings,
+					books: settings.books.filter((b) => b.title !== title),
+				})
+				return
+			},
 			addBook: async () => {
 				const paths = await openBookDialog()
-				console.log(paths)
 				const path = paths.join(",")
 				if (!path) return {}
 				try {
@@ -168,6 +228,7 @@ const rpc = BrowserView.defineRPC<RPC>({
 					return { error: "..." }
 				}
 			},
+			openBook,
 		},
 	},
 })
@@ -198,7 +259,7 @@ const mainWindow = new BrowserWindow({
 	frame: {
 		width: 800,
 		height: 400,
-		x: 900,
+		x: 1900,
 		y: 50,
 	},
 })
