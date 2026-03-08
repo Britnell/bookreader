@@ -3,6 +3,7 @@
 *.wav
 *.jpeg
 tmp/
+build/
 
 *.epub
 

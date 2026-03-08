@@ -1,8 +1,8 @@
-import type { ElectrobunConfig } from "electrobun";
+import type { ElectrobunConfig } from "electrobun"
 
 export default {
 	app: {
-		name: "react-tailwind-vite",
+		name: "cool-app",
 		identifier: "reacttailwindvite.electrobun.dev",
 		version: "0.0.1",
 	},
@@ -24,4 +24,4 @@ export default {
 			bundleCEF: false,
 		},
 	},
-} satisfies ElectrobunConfig;
+} satisfies ElectrobunConfig

@@ -10,7 +10,9 @@
 		"build:canary": "vite build && electrobun build --env=canary"
 	},
 	"dependencies": {
+		"@tanstack/react-query": "^5.90.21",
 		"electrobun": "1.15.1",
+		"epub2": "^3.0.2",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1"
 	},
