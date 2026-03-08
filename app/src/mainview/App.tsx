@@ -1,5 +1,5 @@
 import Electrobun, { Electroview } from "electrobun/view"
-import { useEffect, useState } from "react"
+import { useRef, useState } from "react"
 import {
 	QueryClient,
 	QueryClientProvider,
@@ -22,6 +22,7 @@ type Book = {
 type OpenBookResult = {
 	title: string
 	chapters: string[]
+	finishedChapters: string[]
 }
 
 type RPC = {
@@ -33,7 +34,8 @@ type RPC = {
 			addBook: { params: undefined; response: object }
 			removeBook: { params: string; response: object }
 			readBook: { params: string; response: object }
-			openBook: { params: string; response: object }
+			openBook: { params: string; response: OpenBookResult }
+			readChapter: { params: string; response: object }
 		}
 		messages: {}
 	}
@@ -53,6 +55,8 @@ const rpc = Electroview.defineRPC<RPC>({
 
 const electrobun = new Electrobun.Electroview({ rpc })
 
+const CONCURRENT_READS = 1
+
 function App() {
 	const { data: settings, refetch: refetchSettings } = useQuery({
 		queryKey: ["settings"],
@@ -60,15 +64,17 @@ function App() {
 	})
 
 	const [openBook, setOpenBook] = useState<Book | null>(null)
+	const [readingChapters, setReadingChapters] = useState<string[]>([])
+	const shouldReadRef = useRef(false)
 
-	const { data } = useQuery({
+	const { data: openBookData } = useQuery({
 		queryKey: ["open", openBook?.title],
 		queryFn: async () => {
 			console.log("open")
 			return (
 				electrobun.rpc?.request
 					.openBook(openBook?.title || "")
-					.catch(console.log) || []
+					.catch(console.log) || null
 			)
 		},
 		enabled: !!openBook?.title,
@@ -76,7 +82,7 @@ function App() {
 
 	console.log({ settings })
 	console.log({ openBook })
-	console.log({ data })
+	console.log({ openBookData })
 	// const { data: books, refetch: refetchBooks } = useQuery({
 	// 	queryKey: ["books"],
 	// 	queryFn: () => electrobun.rpc?.request.getBooks(),
@@ -100,8 +106,33 @@ function App() {
 		setOpenBook(null)
 	}
 
-	const readBook = async (book: Book) => {
-		await electrobun.rpc?.request.readBook(book.title)
+	const startReading = async (book: Book) => {
+		const finished = openBookData?.finishedChapters || []
+		const unread = book.chapters.filter((ch) => !finished.includes(ch))
+
+		for (let i = 0; i < unread.length; i += CONCURRENT_READS) {
+			if (!shouldReadRef.current) break
+			const batch = unread.slice(i, i + CONCURRENT_READS)
+			setReadingChapters(batch)
+			await Promise.all(
+				batch.map((ch) =>
+					electrobun.rpc?.request.readChapter(ch).catch(console.error),
+				),
+			)
+		}
+
+		shouldReadRef.current = false
+		setReadingChapters([])
+	}
+
+	const toggleRead = (book: Book) => {
+		if (shouldReadRef.current) {
+			shouldReadRef.current = false
+			setReadingChapters([])
+		} else {
+			shouldReadRef.current = true
+			startReading(book)
+		}
 	}
 
 	return (
@@ -137,9 +168,9 @@ function App() {
 					<div className="flex gap-3">
 						<button
 							className=" px-1 bg-blue-100 mr-auto"
-							onClick={() => readBook(openBook)}
+							onClick={() => toggleRead(openBook)}
 						>
-							READ
+							{readingChapters.length > 0 ? "STOP" : "READ"}
 						</button>
 						<button
 							className=" px-1 bg-blue-100"
@@ -158,7 +189,15 @@ function App() {
 					<h2>{openBook.title}</h2>
 					<ul className="list-disc ml-4">
 						{openBook?.chapters?.map((ch, i) => (
-							<li key={i}>{ch}</li>
+							<li key={i}>
+								{ch}
+								{readingChapters.includes(ch) && (
+									<span className="ml-2 text-blue-500">[reading]</span>
+								)}
+								{openBookData?.finishedChapters?.includes(ch) && (
+									<span className="ml-2 text-green-500">[done]</span>
+								)}
+							</li>
 						))}
 					</ul>
 				</div>
