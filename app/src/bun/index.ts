@@ -23,7 +23,6 @@ type Book = {
 
 type OpenBookResult = {
 	title: string
-	chapters: string[]
 }
 type Settings = {
 	path: string
@@ -79,6 +78,7 @@ type RPC = {
 			removeBook: { params: string; response: object }
 			addBook: { params: undefined; response: object }
 			openBook: { params: string; response: OpenBookResult }
+			getFinishedChapters: { params: string; response: string[] }
 		}
 	}>
 	webview: RPCSchema<{
@@ -168,9 +168,16 @@ async function openBook(title: string) {
 
 	openEpub = await EPub.createAsync(join(bookDir, "book.epub"), "", "")
 	openBookTitle = title
-	if (!openEpub) return
 
+	return { title }
+}
+
+async function getFinishedChapters(title: string) {
+	if (!openEpub || openBookTitle !== title) throw new Error(`Book not open: ${title}`)
+
+	const bookDir = join(settings.path, title)
 	const files = await readdir(bookDir)
+
 	const results = await Promise.all(
 		openEpub.flow.map(async (chapter, i) => {
 			const paddedIndex = String(i).padStart(2, "0")
@@ -186,9 +193,8 @@ async function openBook(title: string) {
 			return null
 		}),
 	)
-	const chapters = results.filter(Boolean) as string[]
 
-	return { title, chapters }
+	return results.filter(Boolean) as string[]
 }
 
 const rpc = BrowserView.defineRPC<RPC>({
@@ -229,6 +235,7 @@ const rpc = BrowserView.defineRPC<RPC>({
 				}
 			},
 			openBook,
+			getFinishedChapters,
 		},
 	},
 })

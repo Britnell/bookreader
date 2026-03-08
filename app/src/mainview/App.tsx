@@ -19,12 +19,6 @@ type Book = {
 	chapters: string[]
 }
 
-type OpenBookResult = {
-	title: string
-	chapters: string[]
-	finishedChapters: string[]
-}
-
 type RPC = {
 	bun: {
 		requests: {
@@ -34,7 +28,8 @@ type RPC = {
 			addBook: { params: undefined; response: object }
 			removeBook: { params: string; response: object }
 			readBook: { params: string; response: object }
-			openBook: { params: string; response: OpenBookResult }
+			openBook: { params: string; response: { title: string } }
+			getFinishedChapters: { params: string; response: string[] }
 			readChapter: { params: string; response: object }
 		}
 		messages: {}
@@ -69,20 +64,21 @@ function App() {
 
 	const { data: openBookData } = useQuery({
 		queryKey: ["open", openBook?.title],
-		queryFn: async () => {
-			console.log("open")
-			return (
-				electrobun.rpc?.request
-					.openBook(openBook?.title || "")
-					.catch(console.log) || null
-			)
-		},
+		queryFn: () =>
+			electrobun.rpc?.request.openBook(openBook?.title || "").catch(console.log) || null,
 		enabled: !!openBook?.title,
+	})
+
+	const { data: finishedChapters } = useQuery({
+		queryKey: ["finishedChapters", openBook?.title],
+		queryFn: () =>
+			electrobun.rpc?.request.getFinishedChapters(openBook?.title || "").catch(console.log) || null,
+		enabled: !!openBookData,
 	})
 
 	console.log({ settings })
 	console.log({ openBook })
-	console.log({ openBookData })
+	console.log({ finishedChapters })
 	// const { data: books, refetch: refetchBooks } = useQuery({
 	// 	queryKey: ["books"],
 	// 	queryFn: () => electrobun.rpc?.request.getBooks(),
@@ -107,7 +103,7 @@ function App() {
 	}
 
 	const startReading = async (book: Book) => {
-		const finished = openBookData?.finishedChapters || []
+		const finished = finishedChapters || []
 		const unread = book.chapters.filter((ch) => !finished.includes(ch))
 
 		for (let i = 0; i < unread.length; i += CONCURRENT_READS) {
@@ -136,7 +132,7 @@ function App() {
 	}
 
 	return (
-		<div className=" min-h-screen bg-white">
+		<div className=" min-h-screen bg-white p-3">
 			<h1 className="x">App</h1>
 
 			{!openBook && (
@@ -194,7 +190,7 @@ function App() {
 								{readingChapters.includes(ch) && (
 									<span className="ml-2 text-blue-500">[reading]</span>
 								)}
-								{openBookData?.finishedChapters?.includes(ch) && (
+								{finishedChapters?.includes(ch) && (
 									<span className="ml-2 text-green-500">[done]</span>
 								)}
 							</li>
