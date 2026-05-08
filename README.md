@@ -13,7 +13,11 @@ https://n4ze3m.com/blog/running-piper-tts-with-javascript-in-the-bun-runtime
 need phonemizer, and download each voice
 later
 
-
+script
 -[ ] demo mode -t "lorem ipsum"
 -[ ] allow supertonic voices
 -[ ] -list voices
+
+app
+-[ ] allow script to use supertonic voices
+-[ ] add sample in each voice , intro of the hobbit

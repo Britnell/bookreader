@@ -11,6 +11,8 @@ export default {
 		copy: {
 			"dist/index.html": "views/mainview/index.html",
 			"dist/assets": "views/mainview/assets",
+			"node_modules/onnxruntime-node": "node_modules/onnxruntime-node",
+			"node_modules/onnxruntime-node/bin": "bin",
 		},
 		// Ignore Vite output in watch mode — HMR handles view rebuilds separately
 		watchIgnore: ["dist/**"],

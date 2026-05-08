@@ -1,22 +1,17 @@
-// import * as EPub from "epub2/node";
 import { EPub } from "epub2"
 import { parse } from "node-html-parser"
-import { parseArgs } from "util"
 import { voices as kokoroVoices, type Voice as KokoroVoice } from "./kokoro.ts"
 import { voices as supertonicVoices, type Voice as SupertonicVoice } from "./supertonic.ts"
 import { chunkify } from "./textchunking.ts"
 import { joinAudioChunks, embedMetadata, type AudioMetadata } from "./audio.ts"
 
-// Combined voice list and type
 const voices = [...kokoroVoices, ...supertonicVoices] as const
 type Voice = (typeof voices)[number]
 
-// Determine TTS engine based on voice
 function isSupertonicVoice(voice: string): boolean {
 	return supertonicVoices.includes(voice as SupertonicVoice)
 }
 
-// Dynamic TTS loader - only loads the required module when needed
 async function loadTTS(voice: Voice) {
 	if (isSupertonicVoice(voice)) {
 		const { generateSpeech } = await import("./supertonic.ts")
@@ -27,97 +22,56 @@ async function loadTTS(voice: Voice) {
 	}
 }
 
-const { values } = parseArgs({
-	args: Bun.argv,
-	options: {
-		file: { type: "string", short: "f" },
-		voice: { type: "string", short: "v", default: "bf_emma" },
-		speed: { type: "string", short: "s", default: "1" },
-		text: { type: "string", short: "t" },
-		chapter: { type: "string", short: "c", default: "0" },
-		list: { type: "boolean", short: "l" },
-		help: { type: "boolean", short: "h" },
-	},
-	strict: true,
-	allowPositionals: true,
-})
-
-const help = `
-USAGE
-  bun bun.ts [options]
-
-OPTIONS
-  -f, --file <path>    ePub file to convert
-  -v, --voice <name>   Voice to use          (default: bf_emma)
-  -s, --speed <num>    Speech speed          (default: 1)
-  -t, --text <text>    Speak text and play it (test mode, no file needed)
-  -c, --chapter <num>  Start chapter index   (default: 0)
-  -l, --list           List all available voices
-  -h, --help           Show this help
-
-EXAMPLES
-  bun bun.ts -f mybook.epub
-  bun bun.ts -f mybook.epub -v am_michael -s 1.2
-  bun bun.ts -f mybook.epub -c 5
-  bun bun.ts -t "Hello world" -v bf_alice
-  bun bun.ts --list
-`
-
-if (values.help) {
-	console.log(help)
-	process.exit(0)
+export interface ReadBookOptions {
+	file?: string
+	voice?: Voice
+	speed?: number
+	chapter?: number
+	text?: string
+	log?: (message: string) => void
 }
 
-if (values.list) {
-	console.log(`Kokoro Voices:\n` + kokoroVoices.join("\n"))
-	console.log(`\nSupertonic Voices:\n` + supertonicVoices.join("\n"))
-	process.exit(0)
-}
+export async function readBook(options: ReadBookOptions = {}) {
+	const {
+		file,
+		voice = "bf_emma" as Voice,
+		speed = 1,
+		chapter: startChapter = 0,
+		text,
+		log = console.log,
+	} = options
 
-if (!values.file && !values.text) {
-	console.error("Error: provide a file (-f) or text (-t)\n")
-	console.log(help)
-	process.exit(1)
-}
+	if (!voices.includes(voice)) {
+		throw new Error(
+			`Unknown voice "${voice}". Available voices:\n` +
+			`Kokoro: ${kokoroVoices.join(", ")}\n` +
+			`Supertonic: ${supertonicVoices.join(", ")}`,
+		)
+	}
 
-const voice = values.voice as Voice
-const speed = parseFloat(values.speed)
-const startChapter = parseInt(values.chapter)
-
-if (!voices.includes(voice)) {
-	console.error(`Error: unknown voice "${voice}"\n`)
-	console.log(`Kokoro Voices:\n` + kokoroVoices.join("\n"))
-	console.log(`\nSupertonic Voices:\n` + supertonicVoices.join("\n"))
-	process.exit(1)
-}
-
-if (values.text) {
 	const generateSpeech = await loadTTS(voice)
-	const audio = await generateSpeech({ text: values.text, voice, speed })
-	const tmpPath = "./tmp/_test.wav"
-	await audio.save(tmpPath)
-	const proc = Bun.spawn(["ffplay", "-nodisp", "-autoexit", tmpPath], {
-		stdout: "ignore",
-		stderr: "ignore",
-	})
-	await proc.exited
-	process.exit(0)
-}
 
-const file = values.file
+	if (text) {
+		const audio = await generateSpeech({ text, voice, speed })
+		const tmpPath = "./tmp/_test.wav"
+		await audio.save(tmpPath)
+		const proc = Bun.spawn(["ffplay", "-nodisp", "-autoexit", tmpPath], {
+			stdout: "ignore",
+			stderr: "ignore",
+		})
+		await proc.exited
+		return
+	}
 
-main()
-
-async function main() {
-	// Load the TTS engine once based on the selected voice
-	const generateSpeech = await loadTTS(voice)
+	if (!file) {
+		throw new Error("Provide a file or text")
+	}
 
 	const epub = await EPub.createAsync(file, "./tmp", "./tmp")
 
 	const author = epub.metadata.creator || "author"
 	const bookTitle = epub.metadata.title || "untitled"
 
-	// Extract cover image if available
 	let coverImagePath: string | undefined
 	if (epub.metadata.cover) {
 		try {
@@ -126,32 +80,28 @@ async function main() {
 			const sanitizedTitle = bookTitle.replace(/[^a-z0-9\s]/gi, "").toLowerCase()
 			coverImagePath = `./tmp/cover_${sanitizedTitle}.${ext}`
 			await Bun.write(coverImagePath, buffer)
-			console.log(`Cover extracted: ${coverImagePath}`)
 		} catch (e) {
-			console.warn("Could not extract cover image:", e)
+			log("Could not extract cover image: " + e)
 		}
 	}
 
-	console.log(`Total chapters: ${epub.flow.length}`)
-
-	// Process all chapters
 	for (let i = startChapter; i < epub.flow.length; i++) {
-		const chapter = epub.flow[i]
+		const ch = epub.flow[i]
 
-		// Check if chapter already exists
-		if (await chapterExists(epub, chapter, i)) {
-			console.log(`[x] chapter exists ${chapter.title || chapter.href}`)
+		if (await chapterExists(epub, ch, i)) {
+			log(`[x] chapter exists ${ch.title || ch.href}`)
 			continue
 		}
 
-		await readChapter(epub, chapter, i, generateSpeech, {
+		await readChapter(epub, ch, i, generateSpeech, voice, speed, {
 			author,
 			bookTitle,
 			coverImagePath,
 			totalTracks: epub.flow.length,
-		})
+		}, log)
 	}
-	console.log("done")
+
+	log("done")
 }
 
 function getBookAndChapterTitles(epub, chapter, index: number) {
@@ -183,12 +133,15 @@ async function readChapter(
 	chapter,
 	index: number,
 	generateSpeech: (options: { text: string; voice: Voice; speed: number }) => Promise<{ save: (path: string) => void }>,
+	voice: Voice,
+	speed: number,
 	bookMeta: {
 		author: string
 		bookTitle: string
 		coverImagePath?: string
 		totalTracks: number
 	},
+	log: (message: string) => void,
 ) {
 	const { sanitizedTitle, chapterFileName } = getBookAndChapterTitles(
 		epub,
@@ -196,29 +149,23 @@ async function readChapter(
 		index,
 	)
 
-	// get text
 	const html = await getChapter(epub, chapter.id)
 	const text = parse(html).textContent
 
-	// Skip empty chapters
 	if (!text.trim()) {
-		console.log(`[x] Skipping empty chapter: ${chapterFileName}`)
+		log(`[x] Skipping empty chapter: ${chapterFileName}`)
 		return
 	}
 
-	// save .txt
 	const outputDir = `./${sanitizedTitle}`
 
-	// Ensure directory exists
 	await Bun.file(outputDir).ensureDir?.()
 
 	const textFile = `${outputDir}/${chapterFileName}.txt`
 	await Bun.write(textFile, text)
 
-	// make audio chunks
 	const chunks = chunkify(text)
 
-	// Skip if no chunks (shouldn't happen after empty text check, but just in case)
 	if (chunks.length === 0) {
 		return
 	}
@@ -226,31 +173,24 @@ async function readChapter(
 	const chunksDir = `./tmp/${sanitizedTitle}`
 	await Bun.write(`${chunksDir}/.keep`, "")
 
-	console.log(`[ ] begin rendering chapter: ${chapterFileName}`)
+	log(`[ ] begin rendering chapter: ${chapterFileName}`)
 
-	// Generate audio for each chunk synchronously
 	for (let i = 0; i < chunks.length; i++) {
 		const chunkPath = `${chunksDir}/${chapterFileName}_${i}.wav`
 
-		// Check if chunk already exists
 		if (await Bun.file(chunkPath).exists()) {
-			// console.log(`Chunk ${i + 1} already exists, skipping generation`)
 			continue
 		}
 
 		const chunk = chunks[i]
 		if (i % 10 === 0)
-			console.log(`\tGenerating chunk ${i + 1} of ${chunks.length}`)
+			log(`\tGenerating chunk ${i + 1} of ${chunks.length}`)
 		const audio = await generateSpeech({ text: chunk, voice, speed })
 		await audio.save(chunkPath)
 	}
 
-	// Join chunks with ffmpeg
-	// console.log("  join chapter chunks + cleanup")
 	await joinAudioChunks(chunksDir, outputDir, chapterFileName, chunks.length)
 
-	// Embed metadata and convert to mp3
-	// console.log("  embedding metadata")
 	const chapterTitle = chapter.title || chapterFileName
 	const wavPath = `${outputDir}/${chapterFileName}.wav`
 	const mp3Path = `${outputDir}/${chapterFileName}.mp3`
@@ -262,7 +202,7 @@ async function readChapter(
 		totalTracks: bookMeta.totalTracks,
 		coverImagePath: bookMeta.coverImagePath,
 	})
-	console.log(`[x] finished chapter: ${chapterFileName}`)
+	log(`[x] finished chapter: ${chapterFileName}`)
 }
 
 function getChapter(epub, id) {

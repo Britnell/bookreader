@@ -1,5 +1,6 @@
 // import * as EPub from "epub2/node";
-import { generateSpeech, type Voice } from "./kokoro.ts"
+// import { generateSpeech, type Voice } from "./kokoro.ts"
+import { generateSpeech } from "./supertonic.ts"
 
 function parseArgs() {
 	const args: Record<string, string> = {}
@@ -10,7 +11,7 @@ function parseArgs() {
 }
 
 const args = parseArgs()
-const voice = args["-v"] as Voice
+const voice = args["-v"] as string
 const speed = args["-sp"] ? parseFloat(args["-sp"]) : 1
 
 main()
